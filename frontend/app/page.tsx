@@ -10,7 +10,6 @@ import { CurrentPatientCard } from "@/components/dashboard/CurrentPatientCard";
 import { WaitingQueueTable } from "@/components/dashboard/WaitingQueueTable";
 import { RecentCallsStackPanel } from "@/components/dashboard/RecentCallsStackPanel";
 import { PatientRegistryTable } from "@/components/patients/PatientRegistryTable";
-import { DsaExplanationView } from "@/components/dashboard/DsaExplanationView";
 import { RegisterPatientDialog } from "@/components/patients/RegisterPatientDialog";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import {
@@ -24,13 +23,12 @@ import {
 } from "lucide-react";
 
 export default function CareQueueDashboard() {
-  // Navigation State
+  // Navigation State (4 operational tabs: overview, queue, registry, recent)
   const [currentTab, setCurrentTab] = useState<NavTab>("overview");
 
   // Core Data State
   const [waitingQueue, setWaitingQueue] = useState<Patient[]>([]);
   const [recentCalls, setRecentCalls] = useState<Patient[]>([]);
-  const [allPatients, setAllPatients] = useState<Patient[]>([]);
   const [stats, setStats] = useState<QueueStats>({
     waitingCount: 0,
     calledTodayCount: 0,
@@ -82,20 +80,18 @@ export default function CareQueueDashboard() {
       setErrorMessage(null);
 
       try {
-        const [healthRes, queueRes, recentRes, statsRes, patientsRes] =
+        const [healthRes, queueRes, recentRes, statsRes] =
           await Promise.all([
             api.checkHealth(),
             api.getWaitingQueue(),
             api.getRecentCalls(),
             api.getDashboardStats(),
-            api.getPatients(),
           ]);
 
         setIsConnected(healthRes.status === "UP");
         setWaitingQueue(queueRes);
         setRecentCalls(recentRes);
         setStats(statsRes);
-        setAllPatients(patientsRes);
       } catch (err: unknown) {
         setIsConnected(false);
         const error = err as Error;
@@ -151,112 +147,121 @@ export default function CareQueueDashboard() {
 
   // Operation: Repeat Last Call
   const handleRepeatCall = async () => {
-    setIsActionLoading(true);
     try {
       const repeated = await api.repeatLastCall();
       showToast(
-        `Repeated announcement for Token ${repeated.tokenNumber} (${repeated.name})`,
+        `Re-announced ${repeated.name} (Token ${repeated.tokenNumber})`,
         "info"
       );
 
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        const text = `Repeating call: token ${repeated.tokenNumber}. ${repeated.name}, please proceed to ${repeated.department}.`;
+        const text = `Repeating call for token ${repeated.tokenNumber}. ${repeated.name}, for ${repeated.department}.`;
         const utterance = new SpeechSynthesisUtterance(text);
         window.speechSynthesis.speak(utterance);
       }
     } catch (err: unknown) {
       const error = err as ApiClientError;
-      showToast(error.message || "No calls to repeat.", "error");
+      showToast(error.message || "No calls available to repeat.", "error");
+    }
+  };
+
+  // Operation: Complete Consultation
+  const handleCompletePatient = async (patientId: string) => {
+    setIsActionLoading(true);
+    try {
+      const completed = await api.completePatient(patientId);
+      showToast(
+        `Completed consultation for ${completed.name} (${completed.tokenNumber}).`,
+        "success"
+      );
+      await fetchData(true);
+    } catch (err: unknown) {
+      const error = err as ApiClientError;
+      showToast(error.message || "Failed to complete patient consultation.", "error");
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  // Operation: Mark Consultation Completed (with confirmation)
   const promptCompletePatient = (patientId: string) => {
-    const target = allPatients.find((p) => p.id === patientId) || currentCalledPatient;
-    const name = target ? target.name : "the patient";
-    const token = target ? target.tokenNumber : "";
-
+    if (!currentCalledPatient) return;
     setConfirmDialog({
       isOpen: true,
-      title: "Confirm Consultation Completion",
-      message: `Mark consultation completed for ${name} (${token})? This patient will be removed from active status and saved to historical records.`,
-      confirmText: "Mark Completed",
+      title: "Complete Consultation",
+      message: `Mark patient ${currentCalledPatient.name} (Token ${currentCalledPatient.tokenNumber}) as completed?`,
+      confirmText: "Complete Consultation",
       isDestructive: false,
       action: async () => {
-        try {
-          await api.completePatient(patientId);
-          showToast(`Consultation completed for ${name}.`, "success");
-          await fetchData(true);
-        } catch (err: unknown) {
-          const error = err as ApiClientError;
-          showToast(error.message || "Failed to complete patient.", "error");
-        }
+        await handleCompletePatient(patientId);
       },
     });
   };
 
-  // Operation: Cancel Waiting Patient (with confirmation)
+  // Operation: Cancel Waiting Patient
+  const handleCancelPatient = async (patientId: string) => {
+    setIsActionLoading(true);
+    try {
+      const cancelled = await api.cancelWaitingPatient(patientId);
+      showToast(
+        `Cancelled queue entry for ${cancelled.name} (${cancelled.tokenNumber}).`,
+        "info"
+      );
+      await fetchData(true);
+    } catch (err: unknown) {
+      const error = err as ApiClientError;
+      showToast(error.message || "Failed to cancel waiting entry.", "error");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   const promptCancelPatient = (patient: Patient) => {
     setConfirmDialog({
       isOpen: true,
-      title: "Cancel Waiting Queue Entry",
-      message: `Are you sure you want to cancel the waiting entry for ${patient.name} (Token: ${patient.tokenNumber})? This will remove them from the queue.`,
-      confirmText: "Cancel Queue Entry",
+      title: "Cancel Queue Entry",
+      message: `Are you sure you want to cancel the queue entry for ${patient.name} (${patient.tokenNumber})? This will remove them from the waiting queue.`,
+      confirmText: "Yes, Cancel Patient",
       isDestructive: true,
       action: async () => {
-        try {
-          await api.cancelWaitingPatient(patient.id);
-          showToast(`Cancelled entry for ${patient.name}.`, "info");
-          await fetchData(true);
-        } catch (err: unknown) {
-          const error = err as ApiClientError;
-          showToast(error.message || "Failed to cancel entry.", "error");
-        }
+        await handleCancelPatient(patient.id);
       },
     });
   };
 
-  // Operation: Register Patient API Submit
-  const handleRegisterSubmit = async (values: RegisterPatientInput): Promise<Patient> => {
-    const registered = await api.registerPatient({
-      name: values.name,
-      department: values.department,
-      age: values.age,
-      notes: values.notes,
-    });
+  // Registration handler passed to modal
+  const handleRegisterSubmit = async (input: RegisterPatientInput) => {
+    const result = await api.registerPatient(input);
     showToast(
-      `Registered ${registered.name} with Token ${registered.tokenNumber}!`,
+      `Registered ${result.name} (Token ${result.tokenNumber}) successfully!`,
       "success"
     );
     await fetchData(true);
-    return registered;
+    return result;
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
-      {/* Top Header */}
+    <div className="min-h-screen bg-slate-50 dark:bg-navy-950 flex flex-col transition-colors duration-200">
+      {/* Top Application Bar */}
       <TopBar
         isConnected={isConnected}
         onOpenRegister={() => setIsRegisterOpen(true)}
-        onRefresh={() => fetchData()}
+        onRefresh={() => fetchData(false)}
         isRefreshing={isRefreshing}
       />
 
-      {/* Disconnection Banner */}
+      {/* Disconnected Backend Warning Banner */}
       {!isConnected && (
-        <div className="bg-rose-600 text-white px-4 py-2.5 text-xs font-medium flex items-center justify-between shadow-inner">
+        <div className="bg-rose-600 text-white text-xs sm:text-sm px-4 py-2.5 flex items-center justify-between shadow-md">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-white shrink-0" />
             <span>
-              <strong>Backend Disconnected:</strong> {errorMessage || "Cannot reach Spring Boot server. Check database and server status."}
+              <strong>Backend Disconnected:</strong> {errorMessage || "Cannot reach Spring Boot server. Please check server status."}
             </span>
           </div>
           <button
             onClick={() => fetchData()}
             disabled={isRefreshing}
-            className="underline hover:text-amber-200 ml-4 shrink-0 flex items-center gap-1"
+            className="underline hover:text-rose-100 ml-4 shrink-0 flex items-center gap-1 font-semibold"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
             Retry Connection
@@ -267,7 +272,7 @@ export default function CareQueueDashboard() {
       {/* Toast Notification Banner */}
       {toastMessage && (
         <div
-          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg border text-xs font-semibold flex items-center gap-2.5 animate-in slide-in-from-bottom-5 duration-200 ${
+          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold flex items-center gap-2.5 animate-in slide-in-from-bottom-5 duration-200 ${
             toastMessage.type === "success"
               ? "bg-emerald-900 text-white border-emerald-700"
               : toastMessage.type === "error"
@@ -277,7 +282,7 @@ export default function CareQueueDashboard() {
         >
           {toastMessage.type === "success" && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
           {toastMessage.type === "error" && <AlertTriangle className="w-4 h-4 text-rose-400" />}
-          {toastMessage.type === "info" && <Clock className="w-4 h-4 text-teal-400" />}
+          {toastMessage.type === "info" && <Clock className="w-4 h-4 text-brand-400" />}
           <span>{toastMessage.text}</span>
         </div>
       )}
@@ -295,27 +300,39 @@ export default function CareQueueDashboard() {
         <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
           {isLoading ? (
             <div className="min-h-[400px] flex flex-col items-center justify-center text-slate-400 space-y-3">
-              <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
-              <p className="text-sm font-medium">Connecting to CareQueue backend...</p>
+              <Loader2 className="w-8 h-8 animate-spin text-brand-600 dark:text-brand-400" />
+              <p className="text-base font-medium">Connecting to CareQueue backend...</p>
             </div>
           ) : (
             <>
               {/* Tab 1: Overview Dashboard */}
               {currentTab === "overview" && (
                 <div className="space-y-6">
+                  {/* Page Title */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                        Hospital Operations Dashboard
+                      </h1>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Real-time overview of current patient flow, waiting line, and consultation activity.
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Stats Cards Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard
                       title="Patients Waiting"
                       value={stats.waitingCount}
-                      subtitle="In FIFO LinkedPatientQueue"
+                      subtitle="Awaiting consultation"
                       icon={Users}
                       variant="amber"
                     />
                     <StatCard
                       title="Called Today"
                       value={stats.calledTodayCount}
-                      subtitle="Pushed to RecentCallsStack"
+                      subtitle="Announced consultations"
                       icon={PhoneCall}
                       variant="brand"
                     />
@@ -333,7 +350,7 @@ export default function CareQueueDashboard() {
                           ? `${stats.averageWaitTimeMinutes}m`
                           : "—"
                       }
-                      subtitle="Calculated from timestamps"
+                      subtitle="Registration to call time"
                       icon={Clock}
                       variant="slate"
                     />
@@ -347,7 +364,7 @@ export default function CareQueueDashboard() {
                     isActionLoading={isActionLoading}
                   />
 
-                  {/* 2-Column Split: Left Waiting Queue (FIFO) + Right Recent Calls (LIFO Stack) */}
+                  {/* 2-Column Split: Left Waiting Queue (FIFO) + Right Recent Calls */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2">
                       <WaitingQueueTable
@@ -371,15 +388,13 @@ export default function CareQueueDashboard() {
               {/* Tab 2: Waiting Queue Full View */}
               {currentTab === "queue" && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                        Waiting Queue Management
-                      </h1>
-                      <p className="text-xs text-slate-500">
-                        Patients waiting in strict First-In, First-Out (FIFO) order.
-                      </p>
-                    </div>
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                      Waiting Queue Management
+                    </h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                      Patients awaiting consultation in strict First-In, First-Out (FIFO) registration sequence.
+                    </p>
                   </div>
                   <WaitingQueueTable
                     queue={waitingQueue}
@@ -390,15 +405,22 @@ export default function CareQueueDashboard() {
                 </div>
               )}
 
-              {/* Tab 3: Recent Calls Stack Full View */}
+              {/* Tab 3: Patient Registry Full View */}
+              {currentTab === "registry" && (
+                <div className="space-y-4">
+                  <PatientRegistryTable onRefreshNeeded={() => fetchData(true)} />
+                </div>
+              )}
+
+              {/* Tab 4: Recent Calls Full View */}
               {currentTab === "recent" && (
                 <div className="space-y-4">
                   <div>
-                    <h1 className="text-xl font-bold tracking-tight text-slate-900">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                       Recent Calls History
                     </h1>
-                    <p className="text-xs text-slate-500">
-                      Last-In, First-Out (LIFO) stack demonstrating call announcements.
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                      Chronological call announcements in reverse-order (newest call at top).
                     </p>
                   </div>
                   <div className="max-w-2xl">
@@ -410,22 +432,12 @@ export default function CareQueueDashboard() {
                   </div>
                 </div>
               )}
-
-              {/* Tab 4: Patient Registry Full View */}
-              {currentTab === "registry" && (
-                <div className="space-y-4">
-                  <PatientRegistryTable patients={allPatients} onRefresh={fetchData} />
-                </div>
-              )}
-
-              {/* Tab 5: DSA Architecture Explanation */}
-              {currentTab === "dsa" && <DsaExplanationView />}
             </>
           )}
         </main>
       </div>
 
-      {/* Register Patient Modal Dialog */}
+      {/* Register Patient Modal Dialog with Similarity Check */}
       <RegisterPatientDialog
         isOpen={isRegisterOpen}
         onClose={() => setIsRegisterOpen(false)}

@@ -3,6 +3,7 @@ package com.carequeue.repository;
 import com.carequeue.entity.PatientEntity;
 import com.carequeue.entity.PatientStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface PatientRepository extends JpaRepository<PatientEntity, String> {
+public interface PatientRepository extends JpaRepository<PatientEntity, String>, JpaSpecificationExecutor<PatientEntity> {
 
     /**
      * Finds all patients currently waiting, ordered chronologically by registration time (FIFO).
@@ -65,9 +66,4 @@ public interface PatientRepository extends JpaRepository<PatientEntity, String> 
      */
     @Query("SELECT p FROM PatientEntity p WHERE p.status = 'COMPLETED' AND p.completedTime >= :since AND p.calledTime IS NOT NULL")
     List<PatientEntity> findCompletedSince(@Param("since") Instant since);
-
-    /**
-     * Returns total count of all registrations ever created, used for sequence generation.
-     */
-    long count();
 }

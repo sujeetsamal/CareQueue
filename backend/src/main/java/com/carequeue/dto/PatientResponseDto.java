@@ -6,6 +6,7 @@ import com.carequeue.entity.PatientStatus;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 
 /**
  * Outgoing response DTO representing a patient record for the frontend.
@@ -22,7 +23,10 @@ public record PatientResponseDto(
         Instant completedTime,
         String notes,
         Integer queuePosition,
-        Long waitDurationSeconds
+        Long waitDurationSeconds,
+        LocalDate queueDate,
+        String departmentCode,
+        Integer sequenceNumber
 ) {
 
     public static PatientResponseDto fromDomain(Patient patient, Integer queuePosition) {
@@ -45,7 +49,10 @@ public record PatientResponseDto(
                 patient.getCompletedTime(),
                 patient.getNotes(),
                 queuePosition,
-                duration
+                duration,
+                patient.getQueueDate(),
+                patient.getDepartmentCode(),
+                patient.getSequenceNumber()
         );
     }
 

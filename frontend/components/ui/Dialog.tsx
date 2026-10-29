@@ -8,7 +8,7 @@ interface DialogProps {
   title: string;
   description?: string;
   children: React.ReactNode;
-  maxWidth?: "sm" | "md" | "lg" | "xl";
+  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl";
 }
 
 export function Dialog({
@@ -40,6 +40,7 @@ export function Dialog({
     md: "max-w-md",
     lg: "max-w-lg",
     xl: "max-w-xl",
+    "2xl": "max-w-2xl",
   };
 
   return (
@@ -51,7 +52,7 @@ export function Dialog({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 bg-slate-950/70 dark:bg-black/80 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -59,26 +60,26 @@ export function Dialog({
       {/* Content Card */}
       <div
         className={cn(
-          "relative w-full rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-900/5 transition-all animate-in zoom-in-95 duration-200",
+          "relative w-full rounded-2xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-navy-700 p-6 shadow-2xl transition-all animate-in zoom-in-95 duration-200 text-slate-900 dark:text-slate-100",
           maxWidthClasses[maxWidth]
         )}
       >
-        <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+        <div className="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-navy-800">
           <div>
             <h2
               id="dialog-title"
-              className="text-lg font-semibold tracking-tight text-slate-900"
+              className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white"
             >
               {title}
             </h2>
             {description && (
-              <p className="mt-1 text-xs text-slate-500">{description}</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{description}</p>
             )}
           </div>
           <button
             onClick={onClose}
             aria-label="Close dialog"
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="rounded-lg p-1 text-slate-400 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-navy-800 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500"
           >
             <X className="w-5 h-5" />
           </button>

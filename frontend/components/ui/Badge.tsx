@@ -16,16 +16,20 @@ export function Badge({
 }: BadgeProps) {
   if (status) {
     const statusClasses: Record<PatientStatus, string> = {
-      WAITING: "bg-amber-100 text-amber-800 border-amber-200",
-      CALLED: "bg-teal-100 text-teal-800 border-teal-300 font-semibold ring-1 ring-teal-400/30",
-      COMPLETED: "bg-emerald-100 text-emerald-800 border-emerald-200",
-      CANCELLED: "bg-rose-100 text-rose-800 border-rose-200",
+      WAITING:
+        "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+      CALLED:
+        "bg-teal-100 dark:bg-brand-950/60 text-teal-800 dark:text-brand-300 border-teal-300 dark:border-brand-700 font-semibold ring-1 ring-teal-400/30",
+      COMPLETED:
+        "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+      CANCELLED:
+        "bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-800",
     };
 
     return (
       <span
         className={cn(
-          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors",
+          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-colors",
           statusClasses[status],
           className
         )}
@@ -35,7 +39,7 @@ export function Badge({
           className={cn(
             "w-1.5 h-1.5 rounded-full mr-1.5",
             status === "WAITING" && "bg-amber-500",
-            status === "CALLED" && "bg-teal-600 animate-pulse",
+            status === "CALLED" && "bg-brand-500 animate-pulse",
             status === "COMPLETED" && "bg-emerald-500",
             status === "CANCELLED" && "bg-rose-500"
           )}
@@ -49,7 +53,7 @@ export function Badge({
     return (
       <span
         className={cn(
-          "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-navy-900 text-teal-300 tracking-wider shadow-sm",
+          "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-navy-950 dark:bg-navy-900 text-brand-300 border border-slate-700/50 dark:border-navy-700 tracking-wider shadow-sm",
           className
         )}
         {...props}
@@ -63,7 +67,7 @@ export function Badge({
     return (
       <span
         className={cn(
-          "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200",
+          "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 dark:bg-navy-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-navy-700",
           className
         )}
         {...props}
@@ -76,7 +80,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200",
+        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-navy-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-navy-700",
         className
       )}
       {...props}

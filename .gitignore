@@ -22,6 +22,8 @@ frontend/build/
 frontend/coverage/
 frontend/test-results/
 frontend/playwright-report/
+*.tsbuildinfo
+
 
 # Logs
 *.log
@@ -37,3 +39,9 @@ yarn-error.log*
 .env.production.local
 backend/.env
 frontend/.env.local
+
+# Local Database Files
+backend/data/
+*.mv.db
+*.trace.db
+

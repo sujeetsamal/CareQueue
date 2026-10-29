@@ -2,6 +2,7 @@ package com.carequeue.entity;
 
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Objects;
 
 /**
@@ -11,7 +12,8 @@ import java.util.Objects;
 @Table(name = "patients", indexes = {
         @Index(name = "idx_patient_status", columnList = "status"),
         @Index(name = "idx_patient_registration_time", columnList = "registration_time"),
-        @Index(name = "idx_patient_token_number", columnList = "token_number", unique = true)
+        @Index(name = "idx_patient_token_number", columnList = "token_number", unique = true),
+        @Index(name = "idx_patients_date_dept", columnList = "queue_date, department_code")
 })
 public class PatientEntity {
 
@@ -47,6 +49,15 @@ public class PatientEntity {
     @Column(name = "notes", length = 250)
     private String notes;
 
+    @Column(name = "queue_date")
+    private LocalDate queueDate;
+
+    @Column(name = "department_code", length = 10)
+    private String departmentCode;
+
+    @Column(name = "sequence_number")
+    private Integer sequenceNumber;
+
     public PatientEntity() {
         // Default constructor for JPA
     }
@@ -62,6 +73,23 @@ public class PatientEntity {
             Instant calledTime,
             Instant completedTime,
             String notes) {
+        this(id, tokenNumber, name, age, department, registrationTime, status, calledTime, completedTime, notes, null, null, null);
+    }
+
+    public PatientEntity(
+            String id,
+            String tokenNumber,
+            String name,
+            Integer age,
+            String department,
+            Instant registrationTime,
+            PatientStatus status,
+            Instant calledTime,
+            Instant completedTime,
+            String notes,
+            LocalDate queueDate,
+            String departmentCode,
+            Integer sequenceNumber) {
         this.id = id;
         this.tokenNumber = tokenNumber;
         this.name = name;
@@ -72,6 +100,9 @@ public class PatientEntity {
         this.calledTime = calledTime;
         this.completedTime = completedTime;
         this.notes = notes;
+        this.queueDate = queueDate;
+        this.departmentCode = departmentCode;
+        this.sequenceNumber = sequenceNumber;
     }
 
     /**
@@ -88,7 +119,10 @@ public class PatientEntity {
                 this.status,
                 this.calledTime,
                 this.completedTime,
-                this.notes
+                this.notes,
+                this.queueDate,
+                this.departmentCode,
+                this.sequenceNumber
         );
     }
 
@@ -106,7 +140,10 @@ public class PatientEntity {
                 domain.getStatus(),
                 domain.getCalledTime(),
                 domain.getCompletedTime(),
-                domain.getNotes()
+                domain.getNotes(),
+                domain.getQueueDate(),
+                domain.getDepartmentCode(),
+                domain.getSequenceNumber()
         );
     }
 
@@ -190,6 +227,30 @@ public class PatientEntity {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public LocalDate getQueueDate() {
+        return queueDate;
+    }
+
+    public void setQueueDate(LocalDate queueDate) {
+        this.queueDate = queueDate;
+    }
+
+    public String getDepartmentCode() {
+        return departmentCode;
+    }
+
+    public void setDepartmentCode(String departmentCode) {
+        this.departmentCode = departmentCode;
+    }
+
+    public Integer getSequenceNumber() {
+        return sequenceNumber;
+    }
+
+    public void setSequenceNumber(Integer sequenceNumber) {
+        this.sequenceNumber = sequenceNumber;
     }
 
     @Override

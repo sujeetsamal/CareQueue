@@ -1,4 +1,13 @@
-import { Patient, QueueStats, RegisterPatientInput, PatientStatus, ApiError } from "@/types/patient";
+import {
+  Patient,
+  QueueStats,
+  RegisterPatientInput,
+  PatientStatus,
+  ApiError,
+  SimilarPatient,
+  PagedResponse,
+  RegistryFilterParams,
+} from "@/types/patient";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api";
 
@@ -93,6 +102,34 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     });
+  },
+
+  getSimilarPatients: async (
+    name: string,
+    department?: string,
+    age?: number | null
+  ): Promise<SimilarPatient[]> => {
+    const query = new URLSearchParams();
+    query.append("name", name);
+    if (department && department !== "ALL") query.append("department", department);
+    if (age !== undefined && age !== null && !isNaN(age)) query.append("age", String(age));
+
+    return request(`/patients/similar?${query.toString()}`);
+  },
+
+  getPatientsPaged: async (params: RegistryFilterParams = {}): Promise<PagedResponse<Patient>> => {
+    const query = new URLSearchParams();
+    if (params.page !== undefined) query.append("page", String(params.page));
+    if (params.size !== undefined) query.append("size", String(params.size));
+    if (params.search) query.append("search", params.search);
+    if (params.department && params.department !== "ALL") query.append("department", params.department);
+    if (params.status && params.status !== "ALL") query.append("status", params.status);
+    if (params.sortBy) query.append("sortBy", params.sortBy);
+    if (params.startDate) query.append("startDate", params.startDate);
+    if (params.endDate) query.append("endDate", params.endDate);
+
+    const qs = query.toString();
+    return request(qs ? `/patients/paged?${qs}` : "/patients/paged");
   },
 
   getPatients: async (params?: {

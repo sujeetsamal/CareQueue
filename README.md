@@ -1,115 +1,133 @@
-# CareQueue — Hospital Patient Queue Management System
+# CareQueue V2 — Hospital Patient Queue Management System
 ### College Data Structures and Algorithms (DSA) Full-Stack Project Manual
-**Technology Stack:** Java 21 · Spring Boot 3.3.5 · Next.js 14 · TypeScript · PostgreSQL · Tailwind CSS · Docker
+**Technology Stack:** Java 21 · Spring Boot 3.3.5 · Next.js 14 · TypeScript · PostgreSQL · H2 · Tailwind CSS · Dark Mode · Docker
 
 ---
 
 ## Table of Contents
 
-- [Section 1 — Project Overview](#section-1--project-overview)
-- [Section 2 — System Workflow](#section-2--system-workflow)
-- [Section 3 — DSA Concepts Explained](#section-3--dsa-concepts-explained)
-- [Section 4 — Requirements and Installation](#section-4--requirements-and-installation)
-- [Section 5 — Environment Variables](#section-5--environment-variables)
-- [Section 6 — How to Run the System](#section-6--how-to-run-the-system)
-- [Section 7 — Operating Manual for the User Interface](#section-7--operating-manual-for-the-user-interface)
+- [Section 1 — Project Overview & What's New in V2](#section-1--project-overview--whats-new-in-v2)
+- [Section 2 — System Architecture & Workflow](#section-2--system-architecture--workflow)
+- [Section 3 — DSA Concepts & Implementation Proofs](#section-3--dsa-concepts--implementation-proofs)
+- [Section 4 — Department-Specific Daily Token System](#section-4--department-specific-daily-token-system)
+- [Section 5 — Smart Registration & Similarity Detection](#section-5--smart-registration--similarity-detection)
+- [Section 6 — Patient Registry & Database Management](#section-6--patient-registry--database-management)
+- [Section 7 — Design System, Dark Mode & UI Manual](#section-7--design-system-dark-mode--ui-manual)
 - [Section 8 — Backend and REST API Reference](#section-8--backend-and-rest-api-reference)
-- [Section 9 — Database and Persistence](#section-9--database-and-persistence)
-- [Section 10 — Testing Manual](#section-10--testing-manual)
-- [Section 11 — Deployment Manual (Vercel & Render)](#section-11--deployment-manual-vercel--render)
-- [Section 12 — Troubleshooting Guide](#section-12--troubleshooting-guide)
-- [Section 13 — Viva and Project Demonstration](#section-13--viva-and-project-demonstration)
+- [Section 9 — Database Schema, Concurrency & Migration](#section-9--database-schema-concurrency--migration)
+- [Section 10 — Environment Variables & Configuration](#section-10--environment-variables--configuration)
+- [Section 11 — How to Run the System Locally](#section-11--how-to-run-the-system-locally)
+- [Section 12 — Testing Manual & Automated Test Results](#section-12--testing-manual--automated-test-results)
+- [Section 13 — Deployment Manual (Vercel & Render)](#section-13--deployment-manual-vercel--render)
+- [Section 14 — Troubleshooting Guide](#section-14--troubleshooting-guide)
+- [Section 15 — Viva and Project Demonstration](#section-15--viva-and-project-demonstration)
 
 ---
 
-## Section 1 — Project Overview
+## Section 1 — Project Overview & What's New in V2
 
 ### 1.1 What CareQueue Does
-**CareQueue** is a modern, responsive, hospital patient queue management system designed for outpatient departments (OPDs), reception desks, and consultation triage rooms.
+**CareQueue** is a full-stack, enterprise-grade hospital patient queue management system designed for outpatient departments (OPDs), triage reception desks, and consultation rooms.
 
 In high-volume hospital environments, overcrowding, lack of transparency in waiting order, and manual paper-ticket confusion create frustration for patients and medical receptionists. CareQueue solves this problem by automating the patient lifecycle:
 
-1. **Patient Registration:** Hospital receptionists register incoming patients with name, department, age, and visit notes.
-2. **Automatic Token Assignment:** The backend generates unique, human-readable queue tokens (e.g., `GEN-101`, `CRD-102`, `EMG-103`).
+1. **Patient Registration:** Hospital receptionists register incoming patients with name, department, age, and optional visit notes.
+2. **Predictable Department Token Assignment:** The backend generates daily department-specific queue tokens formatted as `PREFIX-NNN` (e.g., `GEN-001`, `CRD-001`, `PED-001`, `DER-001`).
 3. **Strict FIFO Queue Management:** Patients enter the queue in First-In, First-Out order managed by a **custom singly linked list queue** (`LinkedPatientQueue`).
-4. **Live Call Execution:** Doctors or triage nurses call the next patient in line. The call removes the head patient, transitions their status to `CALLED`, and records the call timestamp.
+4. **Live Call Execution:** Doctors or triage nurses call the next patient in line. The call dequeues the head node, transitions status to `CALLED`, and records the call timestamp.
 5. **Call History & Repeat Announcements:** Successfully called patients are pushed onto a **custom generic linked stack** (`RecentCallsStack<T>`). The latest announcement can be repeated anytime via stack `peek()`, accompanied by optional browser speech synthesis.
 6. **Consultation Completion & Safe Cancellation:** Patients who finish consultation are marked `COMPLETED`. Unattended patients who leave before consultation can be confirmed and marked `CANCELLED`.
 7. **Persistent State Synchronization:** The database preserves records across backend restarts. On boot, the service reconstructs both the FIFO linked-list queue and the LIFO recent-calls stack from PostgreSQL records.
 
-### 1.2 Academic Prototype Scope & Limitations
-> [!NOTE]
-> CareQueue is an academic Data Structures and Algorithms capstone project demonstrating fundamental computer science principles in a production-style full-stack architecture.
-> - **Fictional Data Only:** Never input Protected Health Information (PHI) or genuine clinical diagnoses.
-> - **Single-Instance Deployment:** The in-memory linked-list queue and stack are synchronized to a single backend JVM instance. Horizontal multi-pod scaling requires distributed queue coordination (e.g., Redis Streams or message brokers).
+---
+
+### 1.2 What's New in CareQueue V2
+CareQueue V2 represents a complete upgrade across design, database architecture, queue numbering, and patient records:
+
+| Feature Area | CareQueue V1 | CareQueue V2 Upgrade |
+|---|---|---|
+| **Theme System** | Light theme only | **Complete Dark Mode** (Light / Dark / System preference) with persistent `localStorage` and zero-flash inline script |
+| **Token Numbering** | Global sequential numbers (e.g., `GEN-106`, `DER-108`) | **Department-specific daily counters** (`PREFIX-001`, `PREFIX-002`) resetting daily at midnight in `Asia/Kolkata` with pessimistic write-locking concurrency |
+| **Patient Registration** | Standard form submission without duplicate checking | **Smart Registration** with debounced (~300ms) **Existing-Patient Similarity Detection** (Levenshtein distance, whitespace normalization, case-folding, bounded to top 5 matches) and duplicate confirmation prompts |
+| **Patient Records** | Simple client-side filtered list | **Full-width Patient Registry** with real **server-side pagination** (10, 25, 50 rows), multi-field database search, status/department/date filters, sorting, and detail view modal |
+| **UI Cleanliness** | Decorative "DSA Under the Hood" card and redundant technical text | **Streamlined healthcare SaaS interface** focused on hospital operations; educational DSA proofs moved cleanly to `README.md` |
+| **Typography Scale** | Small, cramped labels (12-14px) | **Expanded healthcare typography hierarchy** (Headings 28–32px, Body 16px, Table 15–16px, Tokens 30–40px, Stats 30–36px) |
+| **Data Initialization** | Hardcoded demo patients on every start | **Opt-in demo data** (`carequeue.seed-demo-data: false` default), production-ready empty state handling, and safe demo cleanup scripts |
+| **Test Coverage** | 47 backend / 13 frontend tests | **62 backend JUnit/Mockito tests** + **18 frontend Vitest tests** covering tokens, similarity algorithms, and pagination |
+
+---
 
 ### 1.3 Technology Stack
 
 | Layer | Technologies | Version / Notes |
 |---|---|---|
-| **Backend Core** | Java 21, Maven 3.9+ | Standard LTS release with records and pattern matching |
-| **Backend Framework** | Spring Boot, Spring Web, Spring Data JPA | v3.3.5, REST API, Hibernate ORM |
-| **DSA Package** | Custom `LinkedPatientQueue`, `RecentCallsStack<T>`, `StringUtil` | **0% standard library collection shortcuts** for core queue/stack |
-| **Validation & Handling** | Jakarta Bean Validation, `@RestControllerAdvice` | Structured JSON errors, strict input constraints |
-| **Database & Migrations** | PostgreSQL 16 (H2 fallback for tests), Flyway | Explicit schema versioning and index optimization |
-| **Frontend Framework** | Next.js 14 (App Router), React 18 | TypeScript in strict mode, server-side pre-rendering |
-| **Styling & UI Components** | Tailwind CSS, Lucide React, Framer Motion | Calm healthcare palette: deep navy, teal, mint, warm slate |
-| **Form Handling** | React Hook Form, Zod schema validation | Real-time client-side error states and character limits |
-| **Automated Testing** | JUnit 5, Mockito, SpringBootTest, MockMvc, Vitest, Playwright | 100% automated coverage across all layers |
+| **Backend Core** | Java 21 LTS, Maven 3.9+ | Modern LTS release with records, pattern matching, and Virtual Thread readiness |
+| **Backend Framework** | Spring Boot 3.3.5, Spring Web, Spring Data JPA | REST API, Hibernate ORM, Bean Validation |
+| **DSA Package** | Custom `LinkedPatientQueue`, `RecentCallsStack<T>`, `StringUtil` | **0% standard library collection shortcuts** for core queue and stack |
+| **Database & Migrations** | PostgreSQL 16 (H2 file/memory fallback), Flyway | Flyway schema migrations `V1__init_schema.sql` and `V2__department_daily_tokens.sql` |
+| **Frontend Framework** | Next.js 14.2 (App Router), React 18 | TypeScript strict mode, server-side pre-rendering |
+| **Styling & Theme** | Tailwind CSS 3.4, Vanilla CSS variables, Lucide React | Modern healthcare SaaS design system: deep navy/charcoal dark mode, teal accents |
+| **Form Handling & Validation** | React Hook Form, Zod schema validation | Real-time debounced similarity lookups, client-side character bounding |
+| **Testing Suite** | JUnit 5, Mockito, SpringBootTest, MockMvc, Vitest, React Testing Library | 100% automated test execution on every build |
 
 ---
 
-## Section 2 — System Workflow
+## Section 2 — System Architecture & Workflow
 
-The following Mermaid flowchart documents the patient queue lifecycle from initial registration to consultation completion or cancellation:
+The following flowchart documents the complete patient lifecycle, similarity validation, queue execution, and stack synchronization:
 
 ```mermaid
 flowchart TD
-    A([Patient Arrives at Reception]) --> B[Staff Fills Registration Form]
-    B --> C{Client & Server Validation\nStringUtil / Zod}
-    C -- Invalid (Blank/Too Long) --> D[Display Field Error in UI]
-    C -- Valid Input --> E[Generate Unique Token e.g. GEN-101]
-    E --> F[(Persist to PostgreSQL\nstatus = WAITING)]
-    F --> G[LinkedPatientQueue.enqueue\nTail insertion O(1)]
-    G --> H[Update Dashboard & Queue UI\nAssign Position #N]
+    A([Patient Arrives at Reception]) --> B[Staff Opens Registration Dialog]
+    B --> C[Staff Types Patient Full Name]
     
-    H --> I{Reception / Doctor Action}
+    C --> D{Debounced Search ~300ms\nGET /api/patients/similar}
+    D -- Matches Found --> E[Display Possible Existing Records Card\nTop 5 Bounded Matches]
+    E --> F{Staff Review}
+    F -- Active WAITING Match Found --> G[Display Warning & Require Explicit Confirmation]
+    F -- Legitimate New Patient --> H[Proceed with Registration]
+    D -- No Matches --> H
     
-    I -- Cancel Entry --> J[Confirm Cancellation Modal]
-    J --> K[LinkedPatientQueue.removeById\nSingly Linked Deletion O(n)]
-    K --> L[(Update DB status = CANCELLED)]
-    L --> M[Remove from Waiting View]
+    H --> I[Submit Registration\nPOST /api/patients]
+    I --> J{Spring Boot Transaction\n@Transactional}
     
-    I -- Call Next Patient --> N[LinkedPatientQueue.dequeue\nHead Removal O(1)]
-    N --> O[(Update DB status = CALLED\nRecord calledTime)]
-    O --> P[RecentCallsStack.push\nTop insertion O(1)]
-    P --> Q[Display in Consultation Panel\nAnnounce via Voice / Chime]
+    J --> K[DepartmentTokenService.getNextToken\nAtomic Row-Locking SELECT FOR UPDATE]
+    K --> L[Generate Daily Token e.g. GEN-001\nAsia/Kolkata Calendar Date]
+    L --> M[(Insert into PostgreSQL\npatients + department_daily_tokens)]
+    M --> N[LinkedPatientQueue.enqueue\nTail Insertion O(1)]
+    N --> O[Refresh Dashboard & Waiting Queue UI]
     
-    Q --> R{Doctor Consultation}
-    R -- Repeat Announcement --> S[RecentCallsStack.peek\nO(1) Inspection - No State Mutation]
-    S --> Q
+    O --> P{Doctor or Triage Nurse Action}
     
-    R -- Finish Consultation --> T[Confirm Completion Modal]
-    T --> U[(Update DB status = COMPLETED\nRecord completedTime)]
-    U --> V[Update Dashboard Statistics\nRecord Avg Wait Time]
+    P -- Cancel Ticket --> Q[Confirm Cancellation Modal]
+    Q --> R[LinkedPatientQueue.removeById\nSingly Linked Deletion O(n)]
+    R --> S[(Update DB status = CANCELLED)]
+    S --> T[Remove from Waiting View]
+    
+    P -- Call Next Patient --> U[LinkedPatientQueue.dequeue\nHead Removal O(1)]
+    U --> V[(Update DB status = CALLED\nRecord calledTime)]
+    V --> W[RecentCallsStack.push\nTop Insertion O(1)]
+    W --> X[Display in Consultation Panel\nTrigger Voice Announcement]
+    
+    X --> Y{Consultation Outcome}
+    Y -- Repeat Announcement --> Z[RecentCallsStack.peek\nO(1) Inspection - No State Mutation]
+    Z --> X
+    
+    Y -- Mark Consultation Completed --> AA[Confirm Completion Modal]
+    AA --> AB[(Update DB status = COMPLETED\nRecord completedTime)]
+    AB --> AC[Update Real Daily Statistics\nRecalculate Average Wait Time]
 ```
-
-### State Synchronization Mechanism
-When a REST call modifies the queue (`POST /api/patients`, `POST /api/queue/call-next`, `PATCH /api/patients/{id}/complete`, `DELETE /api/patients/{id}`):
-1. The **database transaction** executes first or concurrently inside `@Transactional` boundaries.
-2. The **in-memory custom data structure** (`LinkedPatientQueue` or `RecentCallsStack`) updates immediately under synchronized locks.
-3. Upon restart, `@PostConstruct initializeQueueState()` queries the database and replays entries to restore the exact state of both data structures.
 
 ---
 
-## Section 3 — DSA Concepts Explained
+## Section 3 — DSA Concepts & Implementation Proofs
 
-This project proves Data Structures and Algorithms principles using genuine, self-contained Java source code rather than wrapper shortcuts around `java.util.Queue` or `java.util.Stack`.
+CareQueue strictly fulfills academic DSA requirements through self-contained Java source files. No standard library collection shortcuts (such as `java.util.LinkedList`, `java.util.Queue`, or `java.util.Stack`) are used for queue and stack mechanics.
 
 ### 3.1 The First-In, First-Out (FIFO) Queue
 A Queue is a linear collection governed by the principle that the first element added is the first element removed. In a hospital waiting room, fairness dictates that the patient who registered earliest must be attended to before subsequent arrivals.
 
-#### How `head`, `tail`, `size`, and `next` Work
+#### Node Structure and Pointers
 `com.carequeue.dsa.LinkedPatientQueue` manages a singly linked list with two external pointers:
 - `head`: Points to the front of the queue (the patient who has waited longest).
 - `tail`: Points to the end of the queue (the most recently registered patient).
@@ -121,13 +139,13 @@ A Queue is a linear collection governed by the principle that the first element 
           ▼                                                  ▼
       ┌───────────┐      ┌───────────┐      ┌───────────┐
       │ Patient 1 │ ───► │ Patient 2 │ ───► │ Patient 3 │ ───► null
-      │ (GEN-101) │ next │ (CRD-102) │ next │ (PED-103) │ next
+      │ (GEN-001) │ next │ (DER-001) │ next │ (GEN-002) │ next
       └───────────┘      └───────────┘      └───────────┘
 ```
 
-#### Actual Source Code: `enqueue` and `dequeue`
+#### Actual Java Source Code: `enqueue` and `dequeue`
 ```java
-// From: com.carequeue.dsa.LinkedPatientQueue.java
+// Location: backend/src/main/java/com/carequeue/dsa/LinkedPatientQueue.java
 
 public synchronized void enqueue(Patient patient) {
     Objects.requireNonNull(patient, "Patient cannot be null when enqueueing.");
@@ -162,12 +180,12 @@ public synchronized Patient dequeue() {
 }
 ```
 
-#### Removing From Middle or Tail (`removeById`)
-When a patient cancels their waiting ticket, they may be located anywhere in the linked list. `removeById(String patientId)` traverses the chain using two pointers (`prev` and `current`):
-- If the target is the `head`, `head` advances to `head.next`.
-- If the target is the `tail`, `tail` is updated to `prev`.
-- If the target is between two nodes, `prev.next = current.next`, splicing out the node without breaking the chain.
-- If the queue had only 1 patient, both `head` and `tail` reset to `null`.
+#### Safe Middle / Tail Node Removal (`removeById`)
+When a waiting patient cancels their visit, they may be located anywhere in the linked list. `removeById(String patientId)` traverses the chain using two pointers (`prev` and `current`):
+- If target is at `head`, `head` advances to `head.next`.
+- If target is at `tail`, `tail` points to `prev`.
+- If target is between two nodes, `prev.next = current.next`, splicing out the node cleanly.
+- If queue had only 1 patient, both `head` and `tail` reset to `null`.
 
 ---
 
@@ -201,7 +219,7 @@ In CareQueue, calling the next patient pushes their record onto `RecentCallsStac
 Calling `pop()` would remove the patient from history. However, repeating an announcement simply needs to inspect who is currently at the top of the stack without modifying history. Therefore, `peek()` is O(1) constant time, non-destructive, and idempotent:
 
 ```java
-// From: com.carequeue.dsa.RecentCallsStack.java
+// Location: backend/src/main/java/com/carequeue/dsa/RecentCallsStack.java
 
 public synchronized T peek() {
     if (isEmpty()) {
@@ -211,27 +229,22 @@ public synchronized T peek() {
 }
 ```
 
-#### Startup Reconstruction Order
-When reconstructing the stack from database records during application boot, historical calls must be retrieved in **chronological order (oldest called first)**. Pushing them in this sequence ensures that the most recently called patient naturally ends up at the `top` of the stack:
-
-```java
-List<PatientEntity> historicalCalls = patientRepository.findCallHistoryForReconstruction();
-for (PatientEntity entity : historicalCalls) {
-    recentCallsStack.push(entity.toDomain());
-}
-```
-
 ---
 
-### 3.3 Java String Operations in DSA
-Strings in Java are immutable sequences of characters. In `com.carequeue.dsa.StringUtil`, real-world String operations are demonstrated:
+### 3.3 Dynamic Programming Levenshtein Distance & Similarity Search
+In `com.carequeue.service.PatientSimilarityService`, CareQueue applies dynamic programming string similarity algorithms to protect registration desks from accidental duplicates:
 
-1. **Whitespace Trimming:** `input.strip()` strips leading and trailing unicode whitespace while leaving internal spacing (e.g., between first and last names) intact.
-2. **Rejection of Blank Input:** `input.isBlank()` prevents whitespace-only names from passing as valid patients.
-3. **Length Bounding:** String lengths are capped (e.g., max 100 characters for names, 250 for notes) to prevent buffer and database memory exhaustion.
-4. **Locale-Independent Normalization:** `input.toLowerCase(Locale.ROOT)` guarantees consistent case folding without unexpected regional variations (such as the Turkish dotted/dotless `i` problem).
-5. **Unicode Preservation:** Names containing accented letters, non-Latin alphabets, or diacritics (e.g., "José María Álvarez", "Jürgen Müller", "आरव शर्मा") are stored and displayed with exact encoding integrity.
-6. **Token Substring Matching:** Case-insensitive search checks whether `patient.getName()` or `patient.getTokenNumber()` contains the search query.
+1. **Whitespace Normalization:** Redundant repeated spaces are collapsed (`name.replaceAll("\\s+", " ").trim()`).
+2. **Case Normalization:** `name.toLowerCase(Locale.ROOT)` eliminates casing differences.
+3. **Exact & Substring Matching:** Fast-path exact and substring checks identify variations like "Maya" vs "Maya Lin".
+4. **Levenshtein Distance Dynamic Programming Matrix:**
+   Computes the minimum edit operations (insertions, deletions, substitutions) required to transform string $s_1$ into $s_2$:
+   $$D(i, j) = \min \begin{cases} 
+   D(i-1, j) + 1 & \text{(deletion)} \\
+   D(i, j-1) + 1 & \text{(insertion)} \\
+   D(i-1, j-1) + \text{cost} & \text{(substitution)}
+   \end{cases}$$
+5. **Contextual Score Bounding:** Candidates are scored between 0.0 and 1.0 based on edit distance, substring overlap, and matching department/age. Results are strictly bounded to the top 5 matches.
 
 ---
 
@@ -245,279 +258,257 @@ Strings in Java are immutable sequences of characters. In `com.carequeue.dsa.Str
 | **LinkedPatientQueue** | `size()` / `isEmpty()` | **O(1)** | O(1) | Maintained via integer counter incremented/decremented on mutations |
 | **LinkedPatientQueue** | `findById()` | **O(n)** | O(1) | Linear traversal from `head` checking `patientId.equals(...)` |
 | **LinkedPatientQueue** | `removeById()` | **O(n)** | O(1) | Linear traversal with two pointers to splice the target node |
-| **LinkedPatientQueue** | `snapshot()` | **O(n)** | O(n) | Traverses all nodes to build an unmodifiable `List<Patient>` snapshot |
+| **LinkedPatientQueue** | `snapshot()` | **O(n)** | O(n) | Traverses all nodes to build an unmodifiable snapshot list |
 | **RecentCallsStack** | `push()` | **O(1)** | O(1) | Prepends to `top`: `this.top = new Node<>(item, this.top);` |
 | **RecentCallsStack** | `pop()` | **O(1)** | O(1) | Removes from `top`: `this.top = this.top.next;` |
 | **RecentCallsStack** | `peek()` | **O(1)** | O(1) | Direct read of `top.item` |
 | **RecentCallsStack** | `toListNewestFirst()` | **O(n)** | O(n) | Traverses top-to-bottom yielding LIFO sequence snapshot |
-| **StringUtil** | `matchesSearch()` | **O(m · k)** | O(1) | Substring search over name and token length |
+| **PatientSimilarityService**| `calculateLevenshtein()`| **O(m · n)** | O(m · n) | 2D dynamic programming edit distance matrix computation |
+| **DepartmentTokenService** | `getNextToken()` | **O(1)** | O(1) | Pessimistic write-locked index lookup on `(queue_date, department_code)` |
 
 ---
 
-## Section 4 — Requirements and Installation
+## Section 4 — Department-Specific Daily Token System
 
-### 4.1 Prerequisites and Version Compatibility
+In CareQueue V2, tokens are generated through a centralized, department-specific daily numbering system.
 
-| Software | Required Version | Verification Command |
+### 4.1 Token Format
+`PREFIX-NNN`
+
+- Prefix: 3-letter uppercase department code.
+- Sequence: 3-digit zero-padded number starting at `001` each day.
+
+#### Department Mapping Table
+| Department Name | Prefix Code | First Token of Day |
 |---|---|---|
-| **Java Development Kit (JDK)** | Java 21 or higher (LTS) | `java -version` |
-| **Apache Maven** | 3.8+ (or bundled `mvnw`) | `mvn -version` or `./mvnw -v` |
-| **Node.js** | v18.18+ or v20+ (tested on v24) | `node -v` |
-| **npm** | 9+ (tested on 11.4+) | `npm -v` |
-| **Docker & Docker Compose** | Docker 20.10+ (Compose v2) | `docker compose version` |
+| General Medicine | `GEN` | `GEN-001` |
+| Dermatology | `DER` | `DER-001` |
+| Pediatrics | `PED` | `PED-001` |
+| Orthopedics | `ORT` | `ORT-001` |
+| Cardiology | `CRD` | `CRD-001` |
+| Emergency | `EMG` | `EMG-001` |
 
-### 4.2 Quick Verification on Windows PowerShell
-Open PowerShell and verify that your tools are accessible in `PATH`:
+*(Any unrecognized department safely defaults to `GEN`)*.
 
-```powershell
-java -version
-mvn -version
-node -v
-npm -v
-```
-
-If `mvn` is not installed globally, you can use the bundled Maven Wrapper located in `backend/mvnw.cmd`.
-
----
-
-## Section 5 — Environment Variables
-
-The table below documents every environment variable used across the system. Safe placeholder values are provided in `.env.example`.
-
-| Variable | Description | Service | Default Value (Dev) | Secret? |
-|---|---|---|---|---|
-| `POSTGRES_DB` | Database name | PostgreSQL / Backend | `carequeue_db` | No |
-| `POSTGRES_USER` | Database username | PostgreSQL / Backend | `carequeue_user` | No |
-| `POSTGRES_PASSWORD` | Database password | PostgreSQL / Backend | `carequeue_secret_dev` | **Yes (in prod)** |
-| `POSTGRES_PORT` | PostgreSQL host port | PostgreSQL | `5432` | No |
-| `SERVER_PORT` | Backend HTTP listening port | Spring Boot Backend | `8080` | No |
-| `SPRING_DATASOURCE_URL` | JDBC connection string | Spring Boot Backend | `jdbc:postgresql://localhost:5432/carequeue_db` | No |
-| `SPRING_DATASOURCE_USERNAME`| JDBC connection user | Spring Boot Backend | `carequeue_user` | No |
-| `SPRING_DATASOURCE_PASSWORD`| JDBC connection password | Spring Boot Backend | `carequeue_secret_dev` | **Yes (in prod)** |
-| `CORS_ALLOWED_ORIGINS` | Permitted browser origins | Spring Boot Backend | `http://localhost:3000,http://127.0.0.1:3000` | No |
-| `CAREQUEUE_SEED_DEMO_DATA` | Seed fictional patients on empty DB | Spring Boot Backend | `true` | No |
-| `NEXT_PUBLIC_API_BASE_URL` | Public backend API URL for client | Next.js Frontend | `http://localhost:8080/api` | No |
+### 4.2 Daily Reset & Timezone Invariant
+1. Sequence numbers reset to `001` at `00:00:00` in the **`Asia/Kolkata`** timezone (`ZoneId.of("Asia/Kolkata")`).
+2. Even if the backend server runs in UTC or another timezone, the queue date is always derived in `Asia/Kolkata`:
+   ```java
+   LocalDate queueDate = LocalDate.now(ZoneId.of("Asia/Kolkata"));
+   ```
+3. Tokens are never reused on the same date: even if `GEN-001` is completed or cancelled, the next patient receives `GEN-002`.
+4. While tokens are department-specific, queue processing remains strictly FIFO across the whole hospital based on registration timestamp.
 
 ---
 
-## Section 6 — How to Run the System
+## Section 5 — Smart Registration & Similarity Detection
 
-Follow this step-by-step startup sequence.
+To prevent accidental duplicate registrations (e.g., receptionists re-registering an already waiting patient), CareQueue V2 features real-time similarity detection.
 
-### Step 1: Start PostgreSQL Database
-From the project root (`CareQueue`):
+### 5.1 Registration Workflow
+1. When entering a patient name with 2 or more characters, the input is debounced by 300ms.
+2. The frontend queries `GET /api/patients/similar?name=...&department=...&age=...`.
+3. If matches are found, a **"Possible existing records"** warning panel appears above the submit button.
+4. If an existing record is in **`WAITING`** status, the system flags an **Active Queue Duplicate** and asks staff to confirm whether they genuinely want to register another patient with the same name.
+5. Staff can click **"View Details"** to inspect the existing patient's historical visit record before submitting.
 
-```powershell
-# Using Docker Compose
-docker compose up -d
-
-# Verify container is running and healthy
-docker compose ps
-```
-
-*(Note: If Docker is not installed on your local machine, the backend includes an embedded H2 in-memory profile for standalone demonstration. See Section 12).*
-
-### Step 2: Start Spring Boot Backend
-Open a dedicated terminal:
-
-```powershell
-cd backend
-
-# On Windows PowerShell:
-.\mvnw.cmd spring-boot:run
-
-# On Linux / macOS:
-./mvnw spring-boot:run
-```
-
-Wait until you see the banner:
-```text
-2026-10-29 ... INFO ... c.c.service.PatientQueueService : CareQueue startup initialization complete.
-2026-10-29 ... INFO ... c.carequeue.CareQueueApplication : Started CareQueueApplication in 3.4 seconds
-```
-
-### Step 3: Start Next.js Frontend
-Open a second dedicated terminal:
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-The frontend development server starts at: `http://localhost:3000`.
-
-### Step 4: Verify Health and Connectivity
-Open your browser or run in PowerShell:
-
-```powershell
-# Check Backend Health Endpoint
-curl http://localhost:8080/api/health
-
-# Response:
-# {"status":"UP","service":"carequeue-backend","version":"1.0.0","waitingCount":3}
-```
-
-Now open **http://localhost:3000** to interact with the CareQueue dashboard.
+### 5.2 Technical Safeguards
+- Non-blocking: Legitimate patients with identical names can still be registered upon confirmation.
+- Privacy-preserving: Clinical notes and sensitive information are never displayed in the similarity panel.
+- Bounded: The backend returns at most the 5 highest-confidence matches.
 
 ---
 
-## Section 7 — Operating Manual for the User Interface
+## Section 6 — Patient Registry & Database Management
 
-The CareQueue interface is designed as an accessible, calm hospital administration console:
+The Patient Registry (`/registry`) provides full visibility across all historical hospital records.
 
-### 1. The Header Bar
-- **Brand Identity:** Shows CareQueue brand mark and project status.
-- **Clock & Date:** Real-time localized date and time ticker.
-- **Connection Indicator:** Green pill (`Backend Live`) confirms healthy REST connectivity; red pill (`Disconnected`) alerts staff if the backend is waking up or unreachable.
-- **Register Patient Action:** Primary button opening the modal dialog.
+### 6.1 Server-Side Pagination & Filtering
+- **Endpoint:** `GET /api/patients/paged`
+- **Page Sizes:** 10, 25, or 50 records per page.
+- **Search:** Case-insensitive substring match across name, token number, and department.
+- **Filters:** Status pills (`ALL`, `WAITING`, `CALLED`, `COMPLETED`, `CANCELLED`), Department dropdown, and Date Range.
+- **Sorting:** Sort by `registrationTime`, `name`, `tokenNumber`, `department`, or `status` in `ASC` or `DESC` order.
+- **Preserved Invariant:** Sorting the registry never modifies the FIFO order of the active waiting queue.
 
-### 2. Statistics Cards
-- **Patients Waiting:** Real-time count of patients waiting in the FIFO linked-list queue.
-- **Called Today:** Count of patients called today (recorded in the LIFO stack).
-- **Completed Today:** Count of patients whose consultation concluded successfully.
-- **Average Wait Time:** Real mathematical calculation in minutes from patient registration to call time.
+### 6.2 Patient Detail Modal
+Clicking **"Details"** on any row opens a comprehensive modal displaying:
+- Large queue token and current status badge.
+- Patient name, age, and department.
+- Registration, call, and completion timestamps.
+- Visit notes.
 
-### 3. Consultation Room Card ("Now In Consultation")
-- Shows the currently attended patient's token in large monospace type (`GEN-101`), their name, department, age, and call timestamp.
-- **"Mark Consultation Completed" Button:** Prompts confirmation and transitions status from `CALLED` to `COMPLETED`.
-- **"Repeat Announcement" Button:** Triggers `RecentCallsStack.peek()` and speech synthesis to re-announce the patient without altering the queue.
+---
 
-### 4. Waiting Queue Panel (FIFO Order)
-- Lists all waiting patients sorted by arrival time.
-- **Position `#1 Next` Badge:** Visually distinguishes the patient at the head of the queue.
-- **"Call Next Patient" Button:** Dequeues the head node and moves them into consultation.
-- **Cancel Button (Trash/X icon):** Prompts confirmation before removing the patient from the linked list and marking them `CANCELLED`.
+## Section 7 — Design System, Dark Mode & UI Manual
 
-### 5. Recent Calls Stack Panel (LIFO Order)
-- Visualizes the top of the stack with a highlighted `STACK TOP` badge.
-- Displays historical called patients from newest to oldest.
-- Includes a **Voice Announcements Toggle** (speaker icon) to enable or mute browser speech announcements.
+### 7.1 Modern Healthcare SaaS Design System
+CareQueue V2 uses a clean, professional aesthetic tailored for clinical environments:
+- **Light Theme:** Cool slate-50 canvas, crisp white cards, slate-200 borders, deep navy typography.
+- **Dark Theme:** Deep slate-950 canvas, slate-900 surface cards, slate-800 borders, slate-100 high-contrast typography.
+- **Brand Accent:** High-contrast Teal (`teal-600` in light, `teal-500` in dark).
+- **Status Colors:**
+  - `WAITING`: Amber / Yellow badge.
+  - `CALLED`: Blue / Sky badge.
+  - `COMPLETED`: Emerald / Green badge.
+  - `CANCELLED`: Rose / Red badge.
 
-### 6. Patient Registry & Search View
-- Click **"Patient Registry"** in the sidebar.
-- Use the search bar to query by token (e.g. `CQ-101`) or name (e.g. `Maya`) with case-insensitive `Locale.ROOT` matching.
-- Filter by department dropdown or status pills (`ALL`, `WAITING`, `CALLED`, `COMPLETED`, `CANCELLED`).
+### 7.2 Complete Dark Mode & Zero-Flash Implementation
+- **Theme Selector:** Located in the top bar with options: **Light**, **Dark**, and **System**.
+- **Persistence:** Saved in `localStorage` under key `carequeue-theme`.
+- **Zero-Flash Execution:** An inline script in `app/layout.tsx` checks `localStorage` and system media query `(prefers-color-scheme: dark)` before React hydrates, preventing any white flash on dark mode page reload.
+
+### 7.3 Typography Scale
+| Element | Font Size | Font Weight | Tailwind Class |
+|---|---|---|---|
+| Main Page Heading | 28–32 px | SemiBold (600) | `text-2xl sm:text-3xl font-semibold` |
+| Secondary Heading | 21–24 px | SemiBold (600) | `text-xl sm:text-2xl font-semibold` |
+| Section / Card Heading | 17–20 px | Medium / SemiBold | `text-lg sm:text-xl font-medium` |
+| Body Text | 16 px | Regular (400) | `text-base` |
+| Table Content | 15–16 px | Regular / Medium | `text-sm sm:text-base` |
+| Form Labels | 14–16 px | Medium (500) | `text-sm font-medium` |
+| Prominent Queue Token | 30–40 px | Bold (700) Monospace | `text-3xl sm:text-4xl font-mono font-bold` |
+| Dashboard Statistics | 30–36 px | Bold (700) | `text-3xl font-bold` |
 
 ---
 
 ## Section 8 — Backend and REST API Reference
 
-All endpoints return standard JSON and appropriate HTTP status codes.
+All endpoints return standard JSON payloads and appropriate HTTP status codes.
 
 ### 8.1 Health & Dashboard
 
 #### `GET /api/health`
-- **Purpose:** Health check for containers, Render, and uptime monitors.
+- **Purpose:** Service health check and current waiting count.
 - **Response:** `200 OK`
 ```json
 {
   "status": "UP",
   "service": "carequeue-backend",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "waitingCount": 3
 }
 ```
 
 #### `GET /api/dashboard/stats`
-- **Purpose:** Analytics metrics for cards.
+- **Purpose:** Real-time analytics computed from start of local day (`Asia/Kolkata`).
 - **Response:** `200 OK`
 ```json
 {
   "waitingCount": 2,
-  "calledTodayCount": 3,
-  "completedTodayCount": 2,
-  "averageWaitTimeMinutes": 14.5
+  "calledTodayCount": 5,
+  "completedTodayCount": 4,
+  "averageWaitTimeMinutes": 12.3
 }
 ```
 
 ---
 
-### 8.2 Queue Operations (DSA Core)
+### 8.2 Queue Operations (Custom DSA)
 
 #### `GET /api/queue/waiting`
 - **Purpose:** Snapshot of all waiting patients in strict FIFO order from `LinkedPatientQueue`.
 - **Response:** `200 OK`
+
+#### `POST /api/queue/call-next`
+- **Purpose:** Dequeues the head patient from `LinkedPatientQueue`, updates database status to `CALLED`, and pushes onto `RecentCallsStack`.
+- **Response:** `200 OK` (returns called patient DTO).
+- **Error:** `404 Not Found` (`QUEUE_EMPTY`) if no patients are waiting.
+
+#### `GET /api/queue/recent-calls`
+- **Purpose:** Returns recent calls ordered newest-first from `RecentCallsStack`.
+- **Response:** `200 OK`
+
+#### `POST /api/queue/repeat-last-call`
+- **Purpose:** Calls `RecentCallsStack.peek()` to retrieve the top patient for re-announcement without mutating queue or stack.
+- **Response:** `200 OK`
+- **Error:** `404 Not Found` (`STACK_EMPTY`) if no calls exist.
+
+---
+
+### 8.3 Patient Lifecycle & V2 Operations
+
+#### `POST /api/patients`
+- **Purpose:** Registers a patient, assigns department daily token (`PREFIX-NNN`), persists to PostgreSQL, and enqueues at queue tail.
+- **Request Body:**
+```json
+{
+  "name": "Maya Lin",
+  "age": 32,
+  "department": "General Medicine",
+  "notes": "Mild seasonal allergic rhinitis"
+}
+```
+- **Response:** `201 Created`
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "tokenNumber": "GEN-001",
+  "name": "Maya Lin",
+  "age": 32,
+  "department": "General Medicine",
+  "registrationTime": "2026-10-29T03:45:00Z",
+  "status": "WAITING",
+  "calledTime": null,
+  "completedTime": null,
+  "notes": "Mild seasonal allergic rhinitis",
+  "queuePosition": 1,
+  "waitDurationSeconds": 0
+}
+```
+
+#### `GET /api/patients/similar`
+- **Purpose:** Debounced similarity check during registration.
+- **Query Params:** `?name=Maya%20Lin&department=General%20Medicine&age=32`
+- **Response:** `200 OK`
 ```json
 [
   {
-    "id": "e6a0a552-246e-4734-bceb-fba01f808793",
-    "tokenNumber": "PED-103",
-    "name": "Liam O'Connor",
-    "age": 7,
-    "department": "Pediatrics",
-    "registrationTime": "2026-10-29T02:00:00Z",
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "tokenNumber": "GEN-001",
+    "name": "Maya Lin",
+    "department": "General Medicine",
+    "age": 32,
     "status": "WAITING",
-    "calledTime": null,
-    "completedTime": null,
-    "notes": "Routine immunization",
-    "queuePosition": 1,
-    "waitDurationSeconds": 420
+    "registrationTime": "2026-10-29T03:45:00Z",
+    "similarityScore": 1.0,
+    "matchReason": "Exact name match"
   }
 ]
 ```
 
-#### `POST /api/queue/call-next`
-- **Purpose:** Dequeues the head patient from `LinkedPatientQueue`, sets status to `CALLED`, and pushes onto `RecentCallsStack`.
-- **Response:** `200 OK` (returns called patient)
-- **Error:** `404 Not Found` if queue is empty:
-```json
-{
-  "message": "No patients are currently waiting in the queue.",
-  "code": "QUEUE_EMPTY",
-  "timestamp": "2026-10-29T02:10:00Z"
-}
-```
-
-#### `GET /api/queue/recent-calls`
-- **Purpose:** Returns recent calls ordered newest-first from `RecentCallsStack`.
-- **Response:** `200 OK` (List of patients from stack top down to bottom).
-
-#### `POST /api/queue/repeat-last-call`
-- **Purpose:** Calls `RecentCallsStack.peek()` to return the stack top for repeat announcement without mutating queue or stack.
+#### `GET /api/patients/paged`
+- **Purpose:** Server-side paginated, filtered, and sorted patient registry query.
+- **Query Params:** `?page=0&size=10&search=maya&department=General%20Medicine&status=WAITING&sortBy=registrationTime&sortDirection=desc`
 - **Response:** `200 OK`
-- **Error:** `404 Not Found` (`STACK_EMPTY`) if no patients have been called yet.
-
----
-
-### 8.3 Patient Lifecycle Operations
-
-#### `POST /api/patients`
-- **Purpose:** Registers a new patient, validates input, assigns token, and enqueues at tail.
-- **Request Body:**
 ```json
 {
-  "name": "Aarav Sharma",
-  "age": 28,
-  "department": "General Medicine",
-  "notes": "Fever and mild cough"
+  "content": [ ... ],
+  "pageNumber": 0,
+  "pageSize": 10,
+  "totalElements": 1,
+  "totalPages": 1,
+  "isFirst": true,
+  "isLast": true
 }
 ```
-- **Response:** `201 Created`
-- **Error:** `400 Bad Request` (`VALIDATION_FAILED`) with field errors if input is blank or exceeds limits.
 
 #### `PATCH /api/patients/{id}/complete`
-- **Purpose:** Marks a `CALLED` patient as `COMPLETED`.
+- **Purpose:** Transitions a `CALLED` patient to `COMPLETED` and records `completedTime`.
 - **Response:** `200 OK`
-- **Error:** `409 Conflict` (`INVALID_STATUS_TRANSITION`) if patient is not currently `CALLED`.
 
 #### `DELETE /api/patients/{id}`
-- **Purpose:** Cancels a `WAITING` patient's queue ticket and removes them from `LinkedPatientQueue`.
-- **Response:** `200 OK` (returns cancelled patient).
-- **Error:** `409 Conflict` if patient is already called or completed.
-
-#### `GET /api/patients`
-- **Purpose:** Search and list all patient records.
-- **Query Params:** `?search=maya&department=General Medicine&status=WAITING`
+- **Purpose:** Cancels a `WAITING` patient's ticket, removes them from `LinkedPatientQueue`, and marks status `CANCELLED`.
 - **Response:** `200 OK`
 
 ---
 
-## Section 9 — Database and Persistence
+## Section 9 — Database Schema, Concurrency & Migration
 
-### 9.1 Relational Schema and Entity Mapping
-PostgreSQL table `patients` is managed via Flyway migration `V1__init_schema.sql`:
+### 9.1 Relational Schema & Flyway Migrations
+PostgreSQL schema is version-controlled with Flyway:
 
+#### `V1__init_schema.sql`
 ```sql
 CREATE TABLE IF NOT EXISTS patients (
     id VARCHAR(36) PRIMARY KEY,
@@ -537,228 +528,249 @@ CREATE INDEX idx_patient_registration_time ON patients (registration_time);
 CREATE INDEX idx_patient_token_number ON patients (token_number);
 ```
 
-### 9.2 Token Generation Logic
-Tokens are generated atomically using department prefixes:
-- Emergency: `EMG-101`
-- Cardiology: `CRD-102`
-- Pediatrics: `PED-103`
-- Orthopedics: `ORT-104`
-- Dermatology: `DER-105`
-- General Medicine: `GEN-106`
+#### `V2__department_daily_tokens.sql`
+```sql
+-- Track department-specific daily sequences atomically
+CREATE TABLE IF NOT EXISTS department_daily_tokens (
+    queue_date DATE NOT NULL,
+    department_code VARCHAR(10) NOT NULL,
+    last_sequence INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (queue_date, department_code)
+);
 
-### 9.3 Startup Rebuilding of In-Memory DSA Structures
-On application startup:
-1. `findByStatusOrderByRegistrationTimeAsc(PatientStatus.WAITING)` retrieves all uncalled patients in exact chronological order. Each is enqueued into `LinkedPatientQueue` via `enqueue()`.
-2. `findCallHistoryForReconstruction()` retrieves historical calls ordered by `calledTime ASC` (oldest call first). Each is pushed into `RecentCallsStack` via `push()`, leaving the most recent call at the top.
+-- Add sequence audit columns to patients table
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS queue_date DATE;
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS department_code VARCHAR(10);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS sequence_number INT;
+
+CREATE INDEX IF NOT EXISTS idx_patients_queue_date_dept 
+ON patients (queue_date, department_code);
+```
+
+### 9.2 Concurrency & Thread-Safety Design
+To guarantee that two staff members registering patients at the exact same millisecond never receive duplicate tokens:
+1. `DepartmentTokenService.getNextToken()` executes inside an isolated transaction.
+2. It queries `DepartmentDailyTokenRepository.findByQueueDateAndDepartmentCode(queueDate, departmentCode)` using **`@Lock(LockModeType.PESSIMISTIC_WRITE)`**.
+3. Under PostgreSQL, this translates to `SELECT ... FOR UPDATE`, obtaining an exclusive row-level lock on the counter.
+4. The counter increments atomically and commits before the second registration can acquire the sequence.
+
+### 9.3 Demo Data Policy & Safe Cleanup
+- **Default Policy:** `carequeue.seed-demo-data: false` prevents automatic test patient injection on production startup.
+- **Opt-In Demo Seeding:** Set `CAREQUEUE_SEED_DEMO_DATA=true` when initializing an empty database for demonstration.
+- **Safe Cleanup Script:** To remove explicitly tagged development demo records without affecting legitimate patients:
+```sql
+-- Safe Demo Data Cleanup: Run manually if demo records are no longer needed
+DELETE FROM patients 
+WHERE notes IN (
+    'Initial triage - high blood pressure',
+    'Routine skin allergy checkup',
+    'Follow-up for joint pain'
+) AND registration_time < '2026-10-30';
+```
 
 ---
 
-## Section 10 — Testing Manual
+## Section 10 — Environment Variables & Configuration
 
-CareQueue includes automated test coverage across all layers.
+| Variable | Description | Service | Default Value (Dev) | Secret? |
+|---|---|---|---|---|
+| `POSTGRES_DB` | PostgreSQL database name | PostgreSQL / Backend | `carequeue_db` | No |
+| `POSTGRES_USER` | PostgreSQL user | PostgreSQL / Backend | `carequeue_user` | No |
+| `POSTGRES_PASSWORD` | PostgreSQL password | PostgreSQL / Backend | `carequeue_secret_dev` | **Yes (in prod)** |
+| `POSTGRES_PORT` | PostgreSQL host port | PostgreSQL | `5432` | No |
+| `SERVER_PORT` | Backend listening port | Spring Boot Backend | `8080` | No |
+| `SPRING_DATASOURCE_URL` | JDBC connection URL | Spring Boot Backend | `jdbc:postgresql://localhost:5432/carequeue_db` | No |
+| `SPRING_DATASOURCE_USERNAME`| JDBC connection user | Spring Boot Backend | `carequeue_user` | No |
+| `SPRING_DATASOURCE_PASSWORD`| JDBC connection password | Spring Boot Backend | `carequeue_secret_dev` | **Yes (in prod)** |
+| `CORS_ALLOWED_ORIGINS` | Permitted browser origins | Spring Boot Backend | `http://localhost:3000,http://127.0.0.1:3000` | No |
+| `CAREQUEUE_SEED_DEMO_DATA` | Opt-in fictional seed records | Spring Boot Backend | `false` | No |
+| `NEXT_PUBLIC_API_BASE_URL` | Public backend API URL | Next.js Frontend | `http://localhost:8080/api` | No |
 
-### 10.1 Running Backend Tests (Java / JUnit 5 / Mockito)
-Navigate to `CareQueue/backend`:
+---
 
+## Section 11 — How to Run the System Locally
+
+### Option A: One-Click Startup (PowerShell)
+From the project root (`CareQueue`):
+```powershell
+.\start-dev.ps1
+```
+This automatically launches both the Spring Boot backend on `localhost:8080` and the Next.js frontend on `localhost:3000` in dedicated windows. To stop both services at any time, run:
+```powershell
+.\stop-dev.ps1
+```
+
+---
+
+### Option B: Step-by-Step Manual Startup
+
+#### Step 1: Start PostgreSQL (Optional if using H2)
+```powershell
+docker compose up -d
+```
+*(If Docker is not running, the backend seamlessly falls back to embedded H2 in PostgreSQL compatibility mode).*
+
+#### Step 2: Start Spring Boot Java Backend
 ```powershell
 cd backend
 
-# Execute all unit, service, and REST integration tests:
-.\mvnw.cmd test
+# On Windows PowerShell:
+.\mvnw.cmd spring-boot:run
 
 # On Linux / macOS:
-./mvnw test
+./mvnw spring-boot:run
+```
+Wait for log confirmation:
+```text
+INFO ... c.c.service.PatientQueueService : CareQueue startup initialization complete.
+INFO ... c.carequeue.CareQueueApplication : Started CareQueueApplication in 3.4 seconds
 ```
 
-#### Actual Test Execution Summary:
-- **`com.carequeue.dsa.LinkedPatientQueueTest` (15 tests passed)**
-  1. Enqueue one patient (verifies head and tail pointer initialization).
-  2. Enqueue multiple patients and verify strict FIFO ordering.
-  3. Dequeue advances head pointer and updates size.
-  4. Peek inspects head without removing.
-  5. Empty queue operations throw `QueueEmptyException`.
-  6. Size consistency across interleaved push and pop operations.
-  7. Remove head node correctly.
-  8. Remove tail node correctly.
-  9. Remove middle node correctly without breaking linked chain.
-  10. Remove single remaining patient resets both head and tail to `null`.
-  11. Search existing and missing IDs via `findById`.
-  12. Queue validity preserved across multiple random cancellations.
-  13. Size never becomes negative or inconsistent.
-  14. Null element rejection.
-  15. Snapshot immutability check.
-- **`com.carequeue.dsa.RecentCallsStackTest` (10 tests passed)**
-  1. Push one entry.
-  2. Push multiple entries and verify strict LIFO ordering.
-  3. Peek does not remove top element.
-  4. Pop removes and returns newest element.
-  5. Empty stack throws `StackEmptyException`.
-  6. Push/pop cycles preserve size accuracy.
-  7. `toListNewestFirst()` returns newest-to-oldest order.
-  8. Repeat call action (`peek`) preserves stack immutability.
-  9. Startup reconstruction order (oldest to newest loading yields newest at top).
-  10. Null element rejection.
-- **`com.carequeue.dsa.StringUtilTest` (9 tests passed)**
-  1. Strips leading and trailing whitespace while preserving internal words.
-  2. Rejects null, empty, or whitespace-only strings.
-  3. Enforces maximum length constraints.
-  4. Unicode, accented, and non-Latin character preservation.
-  5. Case-insensitive search using `Locale.ROOT`.
-  6. Search query normalization.
-  7. Department filter matching.
-  8. Distinction of duplicate names with unique IDs.
-  9. Optional string cleaning helper.
-- **`com.carequeue.service.PatientQueueServiceTest` (8 tests passed)**
-  - End-to-end registration, queueing, call-next, cancellation, completion, stats calculation, and startup reconstruction.
-- **`com.carequeue.controller.QueueControllerIntegrationTest` (5 tests passed)**
-  - MockMvc HTTP testing of `/api/health`, `/api/patients`, `/api/queue/waiting`, `/api/queue/call-next`, `/api/queue/repeat-last-call`, and validation errors.
+#### Step 3: Start Next.js Frontend
+Open a second terminal window:
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-**Total Backend Tests: 47 passed, 0 failures, 0 errors.**
+#### Step 4: Open Browser
+- **Dashboard:** [http://localhost:3000](http://localhost:3000)
+- **Health Endpoint:** [http://localhost:8080/api/health](http://localhost:8080/api/health)
 
 ---
 
-### 10.2 Running Frontend Tests (Vitest & React Testing Library)
-Navigate to `CareQueue/frontend`:
+## Section 12 — Testing Manual & Automated Test Results
 
+CareQueue includes 100% automated test suites for both backend and frontend.
+
+### 12.1 Backend Tests (Java / JUnit 5 / Mockito)
+Execute all backend tests:
+```powershell
+cd backend
+.\mvnw.cmd test
+```
+
+#### Verified Test Breakdown (62 Passed, 0 Failures):
+- **`com.carequeue.service.TokenSystemTest` (4 tests passed):**
+  1. Department daily sequence generation (`GEN-001`, `GEN-002`).
+  2. Distinct department counters start independently (`DER-001`).
+  3. Tokens never reused after patient completion or cancellation.
+  4. Concurrent registration thread safety under pessimistic write locks.
+- **`com.carequeue.service.PatientSimilarityServiceTest` (7 tests passed):**
+  1. Exact name matching.
+  2. Case-insensitive matching.
+  3. Repeated whitespace and padding normalization.
+  4. Minor spelling variation detection (Levenshtein distance).
+  5. Distinction between distinct patients with identical names.
+  6. Empty / sub-threshold query rejection.
+  7. Result set bounded to top 5 matches.
+- **`com.carequeue.service.PatientRegistryPaginationTest` (4 tests passed):**
+  1. Paginated queries with custom page size (10, 25, 50).
+  2. Multi-field search across patient names and tokens.
+  3. Status and department filtering.
+  4. Dynamic sorting without modifying queue FIFO order.
+- **`com.carequeue.dsa.LinkedPatientQueueTest` (15 tests passed):**
+  - FIFO head/tail invariant, empty queue safety, middle-node deletion splicing, size tracking, null element rejection.
+- **`com.carequeue.dsa.RecentCallsStackTest` (10 tests passed):**
+  - LIFO push/pop, non-destructive `peek()`, stack size consistency, newest-first snapshot list.
+- **`com.carequeue.dsa.StringUtilTest` (9 tests passed):**
+  - Unicode character preservation, whitespace stripping, Locale.ROOT normalization, length limits.
+- **`com.carequeue.service.PatientQueueServiceTest` (8 tests passed):**
+  - Full lifecycle service tests and startup queue reconstruction.
+- **`com.carequeue.controller.QueueControllerIntegrationTest` (5 tests passed):**
+  - MockMvc HTTP testing of REST endpoints and validation errors.
+
+---
+
+### 12.2 Frontend Tests (Vitest & React Testing Library)
+Execute all frontend component tests:
 ```powershell
 cd frontend
-
-# Run all component and unit tests:
 npx vitest run
 ```
 
-#### Actual Frontend Test Summary:
-- `tests/RegisterPatientDialog.test.tsx` (3 tests passed) — Field rendering, validation errors, successful registration with token display.
-- `tests/WaitingQueueTable.test.tsx` (4 tests passed) — Empty queue state, FIFO list rendering, call-next button trigger, cancellation trigger.
-- `tests/RecentCallsStackPanel.test.tsx` (3 tests passed) — Empty stack state, LIFO ordering, STACK TOP badge, repeat last call action.
-- `tests/PatientRegistryTable.test.tsx` (3 tests passed) — Record rendering, live search filter, status tab filter.
-
-**Total Frontend Tests: 13 passed, 0 failures.**
+#### Verified Test Breakdown (18 Passed, 0 Failures):
+- `tests/ThemeToggle.test.tsx` (4 tests passed) — Light, Dark, System switching and `localStorage` persistence.
+- `tests/RegisterPatientDialog.test.tsx` (4 tests passed) — Field rendering, validation errors, debounced similarity panel, duplicate confirmation.
+- `tests/PatientRegistryTable.test.tsx` (4 tests passed) — Paginated table rendering, search query firing, status filter pills, detail view opening.
+- `tests/WaitingQueueTable.test.tsx` (3 tests passed) — FIFO list rendering, next patient call action, cancel ticket modal.
+- `tests/RecentCallsStackPanel.test.tsx` (3 tests passed) — LIFO stack order, STACK TOP badge, repeat last call action.
 
 ---
 
-### 10.3 Frontend Code Quality Checks
-
+### 12.3 Frontend Strict Linting & Typecheck
 ```powershell
 cd frontend
-
-# TypeScript strict typecheck:
-npm run typecheck
-
-# ESLint check:
-npm run lint
-
-# Production bundle build:
-npm run build
+npm run typecheck    # Exits 0: Strict TypeScript check passed
+npm run lint         # Exits 0: ESLint check passed with zero warnings
+npm run build        # Exits 0: Next.js production build succeeded
 ```
 
 ---
 
-### 10.4 Running End-to-End Tests (Playwright)
-The Playwright test suite exercises the complete hospital workflow in a real browser:
+## Section 13 — Deployment Manual (Vercel & Render)
 
-```powershell
-cd frontend
-
-# Install Playwright browser binaries (one-time setup):
-npx playwright install chromium
-
-# Run the complete user journey:
-npx playwright test
-```
-
----
-
-## Section 11 — Deployment Manual (Vercel & Render)
-
-### 11.1 Deploying the Java Backend on Render
-
-1. **Push your code to GitHub.**
-2. **Log in to [Render](https://render.com).**
-3. **Provision a Managed PostgreSQL Database:**
-   - Click **New +** → **PostgreSQL**.
-   - Name: `carequeue-db`.
-   - Note the **Internal Database URL** and **External Database URL**.
-4. **Deploy the Java Backend as a Web Service:**
-   - Click **New +** → **Web Service**.
-   - Select your GitHub repository.
-   - Root Directory: `backend`.
-   - Environment: `Docker` (Render automatically uses `backend/Dockerfile`).
-   - Instance Type: Free or Starter.
-5. **Configure Backend Environment Variables in Render:**
-   - `SPRING_DATASOURCE_URL`: The PostgreSQL JDBC connection URL (e.g. `jdbc:postgresql://<host>:5432/carequeue_db`).
-   - `SPRING_DATASOURCE_USERNAME`: Your Render database username.
-   - `SPRING_DATASOURCE_PASSWORD`: Your Render database password.
-   - `CORS_ALLOWED_ORIGINS`: `https://<your-vercel-app>.vercel.app`.
-   - `CAREQUEUE_SEED_DEMO_DATA`: `true` (or `false` for clean start).
-6. **Deploy:** Render will build the multi-stage Docker image and expose the service at `https://carequeue-backend.onrender.com`.
-7. **Verify:** Check `https://carequeue-backend.onrender.com/api/health`.
+### 13.1 Deploying the Java Backend on Render
+1. Push your repository to GitHub.
+2. In [Render](https://render.com), create a new **PostgreSQL Database** named `carequeue-db`.
+3. Create a new **Web Service**, select your repo, and set:
+   - Root Directory: `backend`
+   - Environment: `Docker` (Render utilizes `backend/Dockerfile`)
+4. Configure Environment Variables:
+   - `SPRING_DATASOURCE_URL`: PostgreSQL JDBC connection URL.
+   - `SPRING_DATASOURCE_USERNAME`: Render database user.
+   - `SPRING_DATASOURCE_PASSWORD`: Render database password.
+   - `CORS_ALLOWED_ORIGINS`: `https://<your-app>.vercel.app`.
+   - `CAREQUEUE_SEED_DEMO_DATA`: `false`.
+5. Deploy service. It will expose your backend at `https://carequeue-backend.onrender.com`.
 
 ---
 
-### 11.2 Deploying the Next.js Frontend on Vercel
-
-1. **Log in to [Vercel](https://vercel.com).**
-2. **Import Repository:** Click **Add New...** → **Project** and select the repository.
-3. **Configure Project Settings:**
-   - Framework Preset: `Next.js`.
-   - Root Directory: Click Edit and select `frontend`.
-4. **Configure Environment Variables:**
-   - Name: `NEXT_PUBLIC_API_BASE_URL`
-   - Value: `https://carequeue-backend.onrender.com/api` (your deployed Render backend URL).
-5. **Deploy:** Click **Deploy**. Vercel compiles the Next.js production build and deploys to global edge nodes.
+### 13.2 Deploying the Next.js Frontend on Vercel
+1. In [Vercel](https://vercel.com), import your GitHub repository.
+2. Set Root Directory to `frontend`.
+3. Configure Environment Variable:
+   - `NEXT_PUBLIC_API_BASE_URL`: `https://carequeue-backend.onrender.com/api`.
+4. Click **Deploy**. Vercel will build and deploy the production Next.js app to global edge locations.
 
 ---
 
-### 11.3 Connecting Both Deployments & Production Considerations
-1. Update `CORS_ALLOWED_ORIGINS` in your Render backend settings with the exact URL assigned by Vercel (e.g., `https://carequeue.vercel.app`).
-2. Trigger a redeploy on Render after saving CORS origins.
-3. **Free Tier Cold Starts:** Free Render backend instances sleep after 15 minutes of inactivity. When visited after a sleep period, the backend may take 30–50 seconds to boot. The CareQueue UI displays a clear `"Connecting to CareQueue backend..."` spinner and reconnects automatically without crashing.
+## Section 14 — Troubleshooting Guide
 
----
+### 1. Database Connection Failure
+- **Symptoms:** `Connection to localhost:5432 refused`.
+- **Solution:** Ensure Docker Desktop is active and run `docker compose up -d`. If testing locally without Docker, the backend automatically uses embedded H2 in PostgreSQL compatibility mode.
 
-## Section 12 — Troubleshooting Guide
-
-### 1. `java` or `mvn` Not Recognized
-- **Cause:** JDK or Maven is not added to the Windows `PATH` environment variable.
-- **Solution:** Add `C:\Program Files\Java\jdk-21\bin` to your System `PATH`. Alternatively, use the bundled `backend\mvnw.cmd` wrapper script directly.
-
-### 2. Database Connection Error on Local Run
-- **Symptoms:** `Connection to localhost:5432 refused` or `FATAL: password authentication failed`.
-- **Solution:** 
-  1. Ensure Docker Desktop is running and run `docker compose up -d`.
-  2. Verify credentials in `.env` match `compose.yaml`.
-  3. For zero-Docker local testing, run tests with `.\mvnw.cmd test`, which uses the self-contained in-memory H2 PostgreSQL profile automatically.
-
-### 3. Frontend Displays "Backend Disconnected"
-- **Symptoms:** Top bar displays a red badge with a retry button.
+### 2. Frontend Displays "Backend Disconnected"
+- **Symptoms:** Red status indicator in the top bar.
 - **Solution:**
-  1. Check if the Spring Boot server is running on port 8080.
-  2. Open `http://localhost:8080/api/health` in your browser.
-  3. Ensure `NEXT_PUBLIC_API_BASE_URL` in `frontend/.env.local` is set to `http://localhost:8080/api`.
+  1. Verify the Java backend is active on port 8080 (`http://localhost:8080/api/health`).
+  2. Verify `frontend/.env.local` contains `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api`.
+  3. If hosted on Render free tier, allow 30–45 seconds for cold-start wake-up.
 
-### 4. CORS Errors in Browser Console
-- **Symptoms:** `Access to fetch at ... from origin 'http://localhost:3000' has been blocked by CORS policy`.
-- **Solution:** Verify `CORS_ALLOWED_ORIGINS` in backend `application.yml` or environment variables contains your exact frontend origin (`http://localhost:3000`).
-
----
-
-## Section 13 — Viva and Project Demonstration
-
-### 13.1 Elevator Pitch for Professors & Examiners
-> *"CareQueue is a full-stack hospital patient queue management system built to demonstrate fundamental Data Structures and Algorithms in a realistic web application. Instead of relying on built-in Java library shortcuts like `java.util.LinkedList` or `java.util.Stack`, we engineered custom, thread-safe linked-node data structures from first principles: `LinkedPatientQueue` for O(1) FIFO patient queueing and `RecentCallsStack` for O(1) LIFO call history and announcements. The system pairs these in-memory data structures with PostgreSQL persistence so that queue order and historical calls are reconstructed after restarts."*
-
-### 13.2 3–5 Minute Practical Demonstration Sequence
-1. **System Health & Dashboard (30s):** Open dashboard at `http://localhost:3000`. Show the 4 statistics cards, the live connection pill, and the empty/waiting queue.
-2. **Registration & Tail Insertion (45s):** Click "Register Patient", enter "Alice Smith", select Cardiology. Show that the backend automatically assigns token `CRD-101` and enqueues her at the tail (Position `#1`). Register "Bob Jones" (Emergency, `EMG-102`, Position `#2`).
-3. **Calling Next & Head Removal (45s):** Click "Call Next Patient". Observe Alice being dequeued from the head of `LinkedPatientQueue` in O(1) time and moving to "Now In Consultation", while Bob advances to Position `#1 Next`.
-4. **Stack Push & Repeat Announcement (45s):** Show that Alice's called record is now at the `STACK TOP` of `RecentCallsStack`. Click "Repeat Announcement" to demonstrate that `peek()` re-announces Alice without modifying stack order or queue state.
-5. **Completion & Cancellation (45s):** Click "Mark Consultation Completed" for Alice. Next, demonstrate cancellation by clicking the cancel icon for Bob, showing the confirmation modal, and verifying that the linked list splices Bob out cleanly.
-6. **Persistence & Reconstruction Proof (30s):** Show in the terminal that restarting the backend service queries the database and replays the queue into `LinkedPatientQueue` and `RecentCallsStack`.
+### 3. Theme Flash on Page Reload
+- **Symptoms:** Brief white background flash before switching to dark mode.
+- **Solution:** CareQueue V2 prevents this using an inline execution script in `frontend/app/layout.tsx`. Ensure JavaScript is enabled in the browser.
 
 ---
 
-### 13.3 17 Viva Questions and Concise Answers
+## Section 15 — Viva and Project Demonstration
+
+### 15.1 Elevator Pitch for Professors & Examiners
+> *"CareQueue V2 is a full-stack hospital patient queue management system engineered to demonstrate fundamental Data Structures and Algorithms in a production-style architecture. Rather than relying on generic Java collections, we built custom, thread-safe linked-node structures from first principles: `LinkedPatientQueue` for O(1) FIFO patient queueing and `RecentCallsStack` for O(1) LIFO call history and announcements. CareQueue V2 introduces department-specific daily tokens (`PREFIX-001`) with pessimistic write-locking concurrency, real-time debounced similarity detection using dynamic programming Levenshtein distance, a full-width paginated patient registry, and a complete dark mode design system."*
+
+### 15.2 3–5 Minute Practical Demonstration Sequence
+1. **Theme & Dashboard (30s):** Open [http://localhost:3000](http://localhost:3000). Toggle between Light, Dark, and System modes to show instant, persistent styling.
+2. **Similarity Detection & Token Allocation (60s):** Click "Register Patient". Type "Maya Lin" and observe the debounced (~300ms) similarity check finding existing records. Proceed to register and show token `GEN-001` generated. Register a Dermatology patient to show independent sequence `DER-001`.
+3. **Queue Calling & LIFO Stack (60s):** Call the next patient. Show the head node dequeued from `LinkedPatientQueue` in O(1) time and pushed onto `RecentCallsStack`. Demonstrate "Repeat Announcement" using O(1) stack `peek()`.
+4. **Patient Registry & Details (60s):** Navigate to "Patient Registry". Demonstrate server-side pagination (10/25/50), multi-field search, status filtering, and open the comprehensive Patient Detail Modal.
+5. **Persistence & Restart Proof (30s):** Restart the backend and show terminal logs verifying that `LinkedPatientQueue` and `RecentCallsStack` are reconstructed from database records.
+
+---
+
+### 15.3 18 Viva Questions and Concise Answers
 
 #### Q1: What is a Queue, and which principle does it follow?
 **Answer:** A Queue is a linear data structure that follows the **First-In, First-Out (FIFO)** principle. Elements are inserted at the rear (`tail`) and removed from the front (`head`).
@@ -766,41 +778,35 @@ npx playwright test
 #### Q2: Why did you use a singly linked list for the Queue instead of an Array?
 **Answer:** In a standard array-based queue, dequeueing from index 0 requires shifting all remaining elements to the left, resulting in **O(n)** time complexity. With a singly linked list, maintaining `head` and `tail` pointers allows both `enqueue` and `dequeue` to execute in **O(1)** constant time.
 
-#### Q3: What is the time complexity of each queue operation in your implementation?
-**Answer:** 
-- `enqueue()`: O(1)
-- `dequeue()`: O(1)
-- `peek()`: O(1)
-- `size()`: O(1)
-- `removeById()`: O(n)
-- `snapshot()`: O(n)
-
-#### Q4: What is a Stack, and which principle does it follow?
+#### Q3: What is a Stack, and which principle does it follow?
 **Answer:** A Stack is a linear data structure following the **Last-In, First-Out (LIFO)** principle. Elements are pushed and popped at a single endpoint called the `top`.
 
-#### Q5: How is the Stack used in CareQueue?
-**Answer:** Every time a patient is called, their snapshot is pushed onto `RecentCallsStack<T>`. This provides a reverse-chronological history of consultations and enables the receptionist to repeat the most recent call announcement.
-
-#### Q6: Why is `peek()` used for the "Repeat Last Call" action instead of `pop()`?
+#### Q4: Why is `peek()` used for the "Repeat Last Call" action instead of `pop()`?
 **Answer:** `pop()` removes and returns the top element from the stack. `peek()` retrieves the top element without removing it, allowing repeated announcements while preserving call history.
 
-#### Q7: Why not just use `java.util.LinkedList` or `java.util.Stack`?
-**Answer:** In academic DSA coursework, the goal is to demonstrate mastery of pointer manipulation, node linkage, invariant management, and edge-case handling (e.g. resetting head/tail when empty) rather than calling pre-existing library abstractions.
+#### Q5: How are department-specific daily tokens formatted and generated in V2?
+**Answer:** Tokens follow `PREFIX-NNN` (e.g. `GEN-001`, `DER-001`). Department codes are mapped from department names, and sequences reset to `001` daily at midnight in the `Asia/Kolkata` timezone.
 
-#### Q8: What happens when the only patient in the queue is dequeued or cancelled?
+#### Q6: How do you prevent race conditions when two patients register simultaneously?
+**Answer:** `DepartmentTokenService` uses PostgreSQL pessimistic write locking (`@Lock(LockModeType.PESSIMISTIC_WRITE)`). This executes `SELECT ... FOR UPDATE` on the `(queue_date, department_code)` row, ensuring atomic counter increments.
+
+#### Q7: How does the Smart Registration similarity check work?
+**Answer:** It combines whitespace normalization, case-folding, substring checks, and a dynamic programming Levenshtein distance matrix ($O(m \cdot n)$ edit distance) to score candidates between 0.0 and 1.0, bounding output to the top 5 matches.
+
+#### Q8: Does sorting the Patient Registry affect the waiting queue order?
+**Answer:** No. The Patient Registry is a historical database query using Spring Data JPA Specifications. The active waiting queue remains strictly ordered by arrival timestamp in `LinkedPatientQueue`.
+
+#### Q9: What happens when the only patient in the queue is dequeued or cancelled?
 **Answer:** Both `head` and `tail` pointers are explicitly set to `null` and `size` is decremented to 0. This prevents memory leaks and stale references.
 
-#### Q9: How do you handle concurrency in your custom data structures?
+#### Q10: How do you handle concurrency in your custom data structures?
 **Answer:** Methods in `LinkedPatientQueue` and `RecentCallsStack` are declared `synchronized`. This guarantees mutually exclusive access across concurrent HTTP threads in the single-instance backend.
-
-#### Q10: How are Java Strings used for searching and validation?
-**Answer:** We trim leading/trailing whitespace using `strip()`, reject whitespace-only names via `isBlank()`, enforce length boundaries, and normalize queries using `toLowerCase(Locale.ROOT)` to avoid locale-dependent character casing anomalies.
 
 #### Q11: How does CareQueue handle non-English or accented names?
 **Answer:** Java Strings use UTF-16 internally. Our validation preserves Unicode characters without lossy conversion, allowing names like "José García" or "आरव शर्मा" to be stored and displayed accurately.
 
 #### Q12: What happens to in-memory data structures when the server restarts?
-**Answer:** Since in-memory RAM is volatile, the `@PostConstruct initializeQueueState()` method queries PostgreSQL on boot, retrieves all persistent `WAITING` patients in chronological order, and re-enqueues them into `LinkedPatientQueue`.
+**Answer:** On boot, the `@PostConstruct initializeQueueState()` method queries the database for all persistent `WAITING` patients in chronological order and re-enqueues them into `LinkedPatientQueue`.
 
 #### Q13: In what order do you reconstruct the RecentCallsStack after boot?
 **Answer:** Historical calls are queried in **oldest-to-newest** chronological order. Pushing each onto the stack ensures that the most recent call ends up at the `top` of the LIFO stack.
@@ -811,17 +817,16 @@ npx playwright test
 #### Q15: What prevents a patient from being cancelled after they are already called?
 **Answer:** The `PatientStatus.canTransitionTo()` state machine rejects invalid transitions. Cancelling is only permitted for patients in `WAITING` status; attempting to cancel a `CALLED` or `COMPLETED` patient throws `InvalidStatusTransitionException` (`409 Conflict`).
 
-#### Q16: Why is horizontal multi-pod scaling a limitation of this project?
+#### Q16: How is Zero-Flash Dark Mode achieved?
+**Answer:** An inline script runs in `<head>` before Next.js/React mounts. It reads `localStorage.getItem("carequeue-theme")` or checks `window.matchMedia('(prefers-color-scheme: dark)')` and adds the `'dark'` class to `<html>` synchronously.
+
+#### Q17: Why is horizontal multi-pod scaling a limitation of this project?
 **Answer:** Because `LinkedPatientQueue` lives in the JVM heap of a single instance. If two backend instances ran behind a load balancer without a distributed queue, their in-memory queues would diverge. Scaling would require Redis Streams or a distributed message broker.
 
-#### Q17: What was the automated testing strategy?
-**Answer:** 
-- **Unit tests:** 34 tests for DSA queue, stack, and string operations.
-- **Integration tests:** 13 MockMvc tests for REST controllers, JPA persistence, and exceptions.
-- **Frontend tests:** 13 Vitest tests for form validation, table rendering, and interactions.
-- **End-to-End tests:** Playwright test verifying the full user journey in Chromium.
+#### Q18: What is the total automated test count for CareQueue V2?
+**Answer:** 80 automated tests: 62 backend JUnit 5 / Mockito tests (covering token concurrency, similarity detection, registry pagination, custom queue/stack, and REST controllers) and 18 frontend Vitest tests.
 
 ---
 
-### End of CareQueue Master Documentation Manual
-*CareQueue — Hospital Patient Queue Management System · Academic DSA Capstone Deliverable*
+### End of CareQueue V2 Master Documentation Manual
+*CareQueue V2 — Hospital Patient Queue Management System · Academic DSA Capstone Deliverable*

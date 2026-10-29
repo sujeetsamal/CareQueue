@@ -20,21 +20,21 @@ export function WaitingQueueTable({
   isCallingNext = false,
 }: WaitingQueueTableProps) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <div className="rounded-2xl border border-slate-200 dark:border-navy-800 bg-white dark:bg-navy-900 shadow-sm overflow-hidden transition-colors duration-200">
       {/* Header Bar */}
-      <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
+      <div className="p-5 border-b border-slate-100 dark:border-navy-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50 dark:bg-navy-950/40">
         <div>
-          <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-brand-700" />
-            <h2 className="text-base font-bold text-slate-900 tracking-tight">
-              Waiting Queue (FIFO Order)
+          <div className="flex items-center gap-2.5">
+            <Users className="w-5 h-5 text-brand-600 dark:text-brand-400" />
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+              Waiting Queue
             </h2>
-            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-100 text-brand-800">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-100 dark:bg-brand-950/60 text-brand-800 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
               {queue.length} Waiting
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Managed by Java <code className="font-mono text-teal-700 bg-teal-50 px-1 py-0.5 rounded">LinkedPatientQueue</code> in first-in, first-out sequence.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Ordered in strict first-in, first-out (FIFO) sequence.
           </p>
         </div>
 
@@ -45,7 +45,7 @@ export function WaitingQueueTable({
           onClick={onCallNext}
           disabled={queue.length === 0 || isCallingNext}
           isLoading={isCallingNext}
-          className="shrink-0 font-semibold"
+          className="shrink-0 font-semibold bg-brand-600 hover:bg-brand-700 shadow-sm"
         >
           <PhoneCall className="w-4 h-4 mr-2" />
           Call Next Patient
@@ -62,19 +62,19 @@ export function WaitingQueueTable({
         />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-slate-50/80 text-[11px] uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-100">
+          <table className="w-full text-left text-sm sm:text-base text-slate-600 dark:text-slate-300">
+            <thead className="bg-slate-50/80 dark:bg-navy-950/60 text-xs uppercase tracking-wider text-slate-400 dark:text-slate-400 font-semibold border-b border-slate-100 dark:border-navy-800">
               <tr>
-                <th className="py-3 px-4">Position</th>
-                <th className="py-3 px-4">Token</th>
-                <th className="py-3 px-4">Patient Name</th>
-                <th className="py-3 px-4">Department</th>
-                <th className="py-3 px-4">Registered At</th>
-                <th className="py-3 px-4">Wait Time</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-3.5 px-4">Position</th>
+                <th className="py-3.5 px-4">Token</th>
+                <th className="py-3.5 px-4">Patient Name</th>
+                <th className="py-3.5 px-4">Department</th>
+                <th className="py-3.5 px-4">Registered At</th>
+                <th className="py-3.5 px-4">Wait Time</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-normal">
+            <tbody className="divide-y divide-slate-100 dark:divide-navy-800 font-normal">
               {queue.map((patient, index) => {
                 const isNext = index === 0;
 
@@ -83,19 +83,19 @@ export function WaitingQueueTable({
                     key={patient.id}
                     className={`transition-colors ${
                       isNext
-                        ? "bg-teal-50/40 hover:bg-teal-50/60 font-medium"
-                        : "hover:bg-slate-50/80"
+                        ? "bg-brand-50/40 dark:bg-brand-950/30 hover:bg-brand-50/60 dark:hover:bg-brand-950/50 font-medium"
+                        : "hover:bg-slate-50/80 dark:hover:bg-navy-800/60"
                     }`}
                   >
                     {/* Position */}
                     <td className="py-3.5 px-4">
                       {isNext ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full ring-1 ring-teal-400/30">
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 dark:text-brand-300 bg-brand-100 dark:bg-brand-950/80 px-2.5 py-1 rounded-full ring-1 ring-brand-400/30">
                           <span>#1 Next</span>
-                          <ArrowRight className="w-3 h-3" />
+                          <ArrowRight className="w-3.5 h-3.5" />
                         </span>
                       ) : (
-                        <span className="text-xs font-semibold text-slate-400">
+                        <span className="text-sm font-semibold text-slate-400 dark:text-slate-500">
                           #{patient.queuePosition || index + 1}
                         </span>
                       )}
@@ -107,10 +107,10 @@ export function WaitingQueueTable({
                     </td>
 
                     {/* Patient Name */}
-                    <td className="py-3.5 px-4 text-slate-900">
-                      <div className="font-semibold">{patient.name}</div>
+                    <td className="py-3.5 px-4 text-slate-900 dark:text-white">
+                      <div className="font-semibold text-base">{patient.name}</div>
                       {patient.age !== null && (
-                        <div className="text-xs text-slate-400 font-normal">
+                        <div className="text-xs text-slate-400 dark:text-slate-400 font-normal">
                           {patient.age} years old
                         </div>
                       )}
@@ -122,14 +122,14 @@ export function WaitingQueueTable({
                     </td>
 
                     {/* Registered At */}
-                    <td className="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
                       {formatTime(patient.registrationTime)}
                     </td>
 
                     {/* Wait Duration */}
-                    <td className="py-3.5 px-4 text-xs font-mono text-slate-600 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 text-slate-500">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <td className="py-3.5 px-4 text-sm font-mono text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                        <Clock className="w-4 h-4 text-slate-400" />
                         {formatDuration(patient.waitDurationSeconds)}
                       </span>
                     </td>
@@ -144,7 +144,7 @@ export function WaitingQueueTable({
                             onClick={onCallNext}
                             disabled={isCallingNext}
                             isLoading={isCallingNext}
-                            className="bg-brand-600 hover:bg-brand-700"
+                            className="bg-brand-600 hover:bg-brand-700 text-white font-semibold"
                           >
                             <PhoneCall className="w-3.5 h-3.5 mr-1" />
                             Call
@@ -154,7 +154,7 @@ export function WaitingQueueTable({
                           variant="ghost"
                           size="sm"
                           onClick={() => onCancelPatient(patient)}
-                          className="text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          className="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                           title="Cancel waiting entry"
                         >
                           <XCircle className="w-4 h-4" />

@@ -8,10 +8,10 @@ describe("RecentCallsStackPanel Component", () => {
   const mockCalls: Patient[] = [
     {
       id: "p1",
-      tokenNumber: "CQ-101",
+      tokenNumber: "GEN-001",
       name: "Latest Called Patient",
       age: 50,
-      department: "Cardiology",
+      department: "General Medicine",
       registrationTime: new Date(Date.now() - 10000).toISOString(),
       status: "CALLED",
       calledTime: new Date().toISOString(),
@@ -22,10 +22,10 @@ describe("RecentCallsStackPanel Component", () => {
     },
     {
       id: "p2",
-      tokenNumber: "CQ-102",
+      tokenNumber: "CRD-001",
       name: "Earlier Called Patient",
       age: 22,
-      department: "General Medicine",
+      department: "Cardiology",
       registrationTime: new Date(Date.now() - 20000).toISOString(),
       status: "COMPLETED",
       calledTime: new Date(Date.now() - 5000).toISOString(),
@@ -44,10 +44,10 @@ describe("RecentCallsStackPanel Component", () => {
       />
     );
 
-    expect(screen.getByText("Stack is Empty")).toBeInTheDocument();
+    expect(screen.getByText("No Recent Calls")).toBeInTheDocument();
   });
 
-  it("renders items in LIFO order and displays STACK TOP indicator", () => {
+  it("renders items in LIFO order and displays LATEST CALL indicator", () => {
     render(
       <RecentCallsStackPanel
         recentCalls={mockCalls}
@@ -56,7 +56,7 @@ describe("RecentCallsStackPanel Component", () => {
     );
 
     expect(screen.getByText("Latest Called Patient")).toBeInTheDocument();
-    expect(screen.getByText("STACK TOP")).toBeInTheDocument();
+    expect(screen.getByText("LATEST CALL")).toBeInTheDocument();
     expect(screen.getByText("Earlier Called Patient")).toBeInTheDocument();
   });
 

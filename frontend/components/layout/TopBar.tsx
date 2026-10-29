@@ -1,5 +1,8 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Activity, UserPlus, RefreshCw, Wifi, WifiOff } from "lucide-react";
 
 interface TopBarProps {
@@ -37,40 +40,40 @@ export function TopBar({
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/90 backdrop-blur-md px-4 sm:px-8">
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200 dark:border-navy-800 bg-white/95 dark:bg-navy-900/95 backdrop-blur-md px-4 sm:px-8 transition-colors duration-200">
       {/* Brand Identity */}
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-navy-950 text-white shadow-sm shadow-brand-600/30">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm shadow-brand-500/30">
           <Activity className="h-5 w-5" />
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-base font-black tracking-tight text-navy-950">
-              Care<span className="text-brand-600">Queue</span>
-            </span>
-            <span className="hidden sm:inline-block rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold text-teal-700 uppercase tracking-widest border border-teal-200/60">
-              DSA Prototype
+            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Care<span className="text-brand-500">Queue</span>
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 hidden sm:block">
+          <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
             Hospital Patient Queue Management System
           </p>
         </div>
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5 sm:gap-3">
         {/* Live Date/Time */}
-        <span className="hidden lg:inline-block text-xs font-medium text-slate-500 font-mono">
+        <span className="hidden xl:inline-block text-xs font-medium text-slate-500 dark:text-slate-400 font-mono">
           {currentDateTime}
         </span>
+
+        {/* Theme Selector Toggle */}
+        <ThemeToggle />
 
         {/* Connection Status Pill */}
         <div
           className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border ${
             isConnected
-              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-              : "bg-rose-50 text-rose-700 border-rose-200"
+              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+              : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
           }`}
           title={
             isConnected
@@ -80,12 +83,12 @@ export function TopBar({
         >
           {isConnected ? (
             <>
-              <Wifi className="h-3.5 w-3.5 text-emerald-600" />
+              <Wifi className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               <span className="hidden sm:inline">Backend Live</span>
             </>
           ) : (
             <>
-              <WifiOff className="h-3.5 w-3.5 text-rose-600 animate-pulse" />
+              <WifiOff className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 animate-pulse" />
               <span className="hidden sm:inline">Disconnected</span>
             </>
           )}
@@ -97,10 +100,10 @@ export function TopBar({
           size="sm"
           onClick={onRefresh}
           disabled={isRefreshing}
-          className="text-xs text-slate-600 hover:text-slate-900 h-9"
+          className="text-xs h-9 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-navy-700 bg-white dark:bg-navy-800 hover:bg-slate-50 dark:hover:bg-navy-700"
           title="Refresh queue and stats from backend"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-teal-600" : ""}`} />
+          <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-brand-500" : ""}`} />
         </Button>
 
         {/* Primary Register Patient Button */}
@@ -108,7 +111,7 @@ export function TopBar({
           variant="primary"
           size="sm"
           onClick={onOpenRegister}
-          className="font-semibold shadow-sm h-9"
+          className="font-semibold shadow-sm h-9 bg-brand-600 hover:bg-brand-700 text-white"
         >
           <UserPlus className="h-4 w-4 mr-1.5" />
           <span className="hidden sm:inline">Register Patient</span>

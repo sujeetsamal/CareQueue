@@ -3,6 +3,7 @@ package com.carequeue.service;
 import com.carequeue.dsa.LinkedPatientQueue;
 import com.carequeue.dsa.RecentCallsStack;
 import com.carequeue.dsa.StringUtil;
+import com.carequeue.dto.PagedResponse;
 import com.carequeue.dto.PatientResponseDto;
 import com.carequeue.dto.QueueStatsDto;
 import com.carequeue.dto.RegisterPatientRequest;
@@ -14,23 +15,28 @@ import com.carequeue.exception.PatientNotFoundException;
 import com.carequeue.exception.QueueEmptyException;
 import com.carequeue.repository.PatientRepository;
 import jakarta.annotation.PostConstruct;
+import jakarta.persistence.criteria.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Service coordinating in-memory custom DSA structures (LinkedPatientQueue, RecentCallsStack)
  * with PostgreSQL persistent storage.
  *
- * Single-instance design: maintains thread-safe state synchronization across REST calls.
+ * Maintains thread-safe state synchronization across REST calls.
  */
 @Service
 public class PatientQueueService {
@@ -38,18 +44,21 @@ public class PatientQueueService {
     private static final Logger log = LoggerFactory.getLogger(PatientQueueService.class);
 
     private final PatientRepository patientRepository;
+    private final DepartmentTokenService departmentTokenService;
     private final LinkedPatientQueue waitingQueue;
     private final RecentCallsStack<Patient> recentCallsStack;
-    private final AtomicInteger tokenSequence;
 
     @Value("${carequeue.seed-demo-data:false}")
     private boolean seedDemoData;
 
-    public PatientQueueService(PatientRepository patientRepository) {
+    public PatientQueueService(
+            PatientRepository patientRepository,
+            DepartmentTokenService departmentTokenService
+    ) {
         this.patientRepository = patientRepository;
+        this.departmentTokenService = departmentTokenService;
         this.waitingQueue = new LinkedPatientQueue();
         this.recentCallsStack = new RecentCallsStack<>();
-        this.tokenSequence = new AtomicInteger(100);
     }
 
     /**
@@ -84,14 +93,13 @@ public class PatientQueueService {
         }
         log.info("Reconstructed RecentCallsStack with {} historical calls.", recentCallsStack.size());
 
-        // Initialize token sequence higher than current count
-        tokenSequence.set((int) Math.max(100, patientRepository.count() + 100));
         log.info("CareQueue startup initialization complete.");
     }
 
     /**
      * Registers a new patient into the waiting queue.
-     * Uses StringUtil for validation, persists to database, and enqueues into LinkedPatientQueue.
+     * Uses StringUtil for validation, allocates a department-specific daily token,
+     * persists to database, and enqueues into LinkedPatientQueue.
      */
     @Transactional
     public synchronized PatientResponseDto registerPatient(RegisterPatientRequest request) {
@@ -100,7 +108,8 @@ public class PatientQueueService {
         String cleanedNotes = StringUtil.cleanOptionalString(request.notes(), 250, "Visit notes");
 
         String id = UUID.randomUUID().toString();
-        String token = generateNextToken(cleanedDept);
+        DepartmentTokenService.TokenAllocation allocation = departmentTokenService.allocateNextToken(cleanedDept);
+        String token = allocation.tokenNumber();
         Instant now = Instant.now();
 
         Patient domain = new Patient(
@@ -113,7 +122,10 @@ public class PatientQueueService {
                 PatientStatus.WAITING,
                 null,
                 null,
-                cleanedNotes
+                cleanedNotes,
+                allocation.queueDate(),
+                allocation.departmentCode(),
+                allocation.sequenceNumber()
         );
 
         PatientEntity entity = PatientEntity.fromDomain(domain);
@@ -280,15 +292,96 @@ public class PatientQueueService {
     }
 
     /**
+     * Full-featured backend pagination, search, and filtering for the Patient Registry.
+     * Does NOT affect or mutate the in-memory waiting queue.
+     */
+    @Transactional(readOnly = true)
+    public PagedResponse<PatientResponseDto> getPatientsPaged(
+            int page,
+            int size,
+            String search,
+            String department,
+            PatientStatus status,
+            String sortBy,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        Specification<PatientEntity> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (search != null && !search.isBlank()) {
+                String searchTrimmed = search.trim();
+                String term = "%" + searchTrimmed.toLowerCase(Locale.ROOT) + "%";
+                Predicate nameLike = cb.like(cb.lower(root.get("name")), term);
+                Predicate tokenLike = cb.like(cb.upper(root.get("tokenNumber")), "%" + searchTrimmed.toUpperCase(Locale.ROOT) + "%");
+                Predicate deptLike = cb.like(cb.lower(root.get("department")), term);
+                Predicate idLike = cb.like(cb.lower(root.get("id")), term);
+                predicates.add(cb.or(nameLike, tokenLike, deptLike, idLike));
+            }
+
+            if (department != null && !department.isBlank() && !"ALL".equalsIgnoreCase(department)) {
+                predicates.add(cb.equal(cb.lower(root.get("department")), department.trim().toLowerCase(Locale.ROOT)));
+            }
+
+            if (status != null) {
+                predicates.add(cb.equal(root.get("status"), status));
+            }
+
+            if (startDate != null) {
+                Instant startInstant = startDate.atStartOfDay(DepartmentTokenService.QUEUE_TIMEZONE).toInstant();
+                predicates.add(cb.greaterThanOrEqualTo(root.get("registrationTime"), startInstant));
+            }
+
+            if (endDate != null) {
+                Instant endInstant = endDate.plusDays(1).atStartOfDay(DepartmentTokenService.QUEUE_TIMEZONE).toInstant();
+                predicates.add(cb.lessThan(root.get("registrationTime"), endInstant));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Sort sort = resolveSort(sortBy);
+        int validPage = Math.max(0, page);
+        int validSize = Math.max(1, Math.min(100, size));
+        PageRequest pageRequest = PageRequest.of(validPage, validSize, sort);
+
+        Page<PatientEntity> pageResult = patientRepository.findAll(spec, pageRequest);
+
+        List<PatientResponseDto> dtos = pageResult.getContent().stream()
+                .map(entity -> PatientResponseDto.fromEntity(entity, null))
+                .toList();
+
+        return PagedResponse.of(dtos, pageResult.getNumber(), pageResult.getSize(), pageResult.getTotalElements());
+    }
+
+    private Sort resolveSort(String sortBy) {
+        if (sortBy == null || sortBy.isBlank()) {
+            return Sort.by(Sort.Direction.DESC, "registrationTime");
+        }
+        return switch (sortBy.toLowerCase(Locale.ROOT)) {
+            case "oldest" -> Sort.by(Sort.Direction.ASC, "registrationTime");
+            case "name_asc" -> Sort.by(Sort.Direction.ASC, "name");
+            case "name_desc" -> Sort.by(Sort.Direction.DESC, "name");
+            case "token_asc" -> Sort.by(Sort.Direction.ASC, "tokenNumber");
+            case "token_desc" -> Sort.by(Sort.Direction.DESC, "tokenNumber");
+            case "department_asc" -> Sort.by(Sort.Direction.ASC, "department");
+            case "status_asc" -> Sort.by(Sort.Direction.ASC, "status");
+            default -> Sort.by(Sort.Direction.DESC, "registrationTime");
+        };
+    }
+
+    /**
      * Calculates real dashboard queue statistics:
      * - Waiting count from LinkedPatientQueue
      * - Called today count
      * - Completed today count
      * - Real calculated average waiting time (in minutes) from registration to call time
+     * Uses Asia/Kolkata timezone to determine start of today.
      */
     public synchronized QueueStatsDto getQueueStats() {
         long waiting = waitingQueue.size();
-        Instant startOfToday = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        LocalDate todayInKolkata = LocalDate.now(DepartmentTokenService.QUEUE_TIMEZONE);
+        Instant startOfToday = todayInKolkata.atStartOfDay(DepartmentTokenService.QUEUE_TIMEZONE).toInstant();
 
         long calledToday = patientRepository.countCalledSince(startOfToday);
         long completedToday = patientRepository.countCompletedSince(startOfToday);
@@ -318,39 +411,18 @@ public class PatientQueueService {
     }
 
     /**
-     * Generates a clean, unique queue token (e.g. "CQ-101", "CQ-102").
-     */
-    private synchronized String generateNextToken(String department) {
-        int seq = tokenSequence.incrementAndGet();
-        String prefix = getDepartmentPrefix(department);
-        return String.format("%s-%d", prefix, seq);
-    }
-
-    private String getDepartmentPrefix(String department) {
-        if (department == null || department.isBlank()) {
-            return "CQ";
-        }
-        String upper = department.trim().toUpperCase(Locale.ROOT);
-        if (upper.contains("EMERGENCY")) return "EMG";
-        if (upper.contains("CARDIO")) return "CRD";
-        if (upper.contains("PEDIATRIC")) return "PED";
-        if (upper.contains("ORTHO")) return "ORT";
-        if (upper.contains("DERMAT")) return "DER";
-        return "GEN";
-    }
-
-    /**
      * Seeds realistic fictional patient demo records for demonstration purposes.
-     * Idempotent: only called if database is initially empty.
+     * Idempotent: only called if database is initially empty AND demo seeding is explicitly enabled.
      */
     private void seedFictionalDemoData() {
         log.info("Seeding fictional demo patients for CareQueue demonstration...");
         Instant now = Instant.now();
+        LocalDate today = LocalDate.now(DepartmentTokenService.QUEUE_TIMEZONE);
 
         // 1. Completed patient (called 45 min ago, completed 20 min ago)
         PatientEntity p1 = new PatientEntity(
                 UUID.randomUUID().toString(),
-                "GEN-101",
+                "GEN-001",
                 "Maya Lin",
                 34,
                 "General Medicine",
@@ -358,13 +430,16 @@ public class PatientQueueService {
                 PatientStatus.COMPLETED,
                 now.minus(45, ChronoUnit.MINUTES),
                 now.minus(20, ChronoUnit.MINUTES),
-                "Mild seasonal allergies"
+                "Mild seasonal allergies",
+                today,
+                "GEN",
+                1
         );
 
         // 2. Currently Called patient (called 5 min ago)
         PatientEntity p2 = new PatientEntity(
                 UUID.randomUUID().toString(),
-                "CRD-102",
+                "CRD-001",
                 "Carlos Mendez",
                 58,
                 "Cardiology",
@@ -372,13 +447,16 @@ public class PatientQueueService {
                 PatientStatus.CALLED,
                 now.minus(5, ChronoUnit.MINUTES),
                 null,
-                "Blood pressure monitoring"
+                "Blood pressure monitoring",
+                today,
+                "CRD",
+                1
         );
 
         // 3. Waiting patient #1
         PatientEntity p3 = new PatientEntity(
                 UUID.randomUUID().toString(),
-                "PED-103",
+                "PED-001",
                 "Liam O'Connor",
                 7,
                 "Pediatrics",
@@ -386,13 +464,16 @@ public class PatientQueueService {
                 PatientStatus.WAITING,
                 null,
                 null,
-                "Routine immunization"
+                "Routine immunization",
+                today,
+                "PED",
+                1
         );
 
         // 4. Waiting patient #2
         PatientEntity p4 = new PatientEntity(
                 UUID.randomUUID().toString(),
-                "ORT-104",
+                "ORT-001",
                 "Priya Patel",
                 29,
                 "Orthopedics",
@@ -400,13 +481,16 @@ public class PatientQueueService {
                 PatientStatus.WAITING,
                 null,
                 null,
-                "Follow-up for sprained wrist"
+                "Follow-up for sprained wrist",
+                today,
+                "ORT",
+                1
         );
 
         // 5. Waiting patient #3
         PatientEntity p5 = new PatientEntity(
                 UUID.randomUUID().toString(),
-                "GEN-105",
+                "GEN-002",
                 "Hassan Al-Mansoor",
                 45,
                 "General Medicine",
@@ -414,11 +498,13 @@ public class PatientQueueService {
                 PatientStatus.WAITING,
                 null,
                 null,
-                "Annual health screening"
+                "Annual health screening",
+                today,
+                "GEN",
+                2
         );
 
         patientRepository.saveAll(List.of(p1, p2, p3, p4, p5));
-        tokenSequence.set(105);
         log.info("Fictional demo data seeded successfully.");
     }
 }

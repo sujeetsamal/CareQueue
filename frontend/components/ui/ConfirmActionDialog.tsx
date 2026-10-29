@@ -31,7 +31,9 @@ export function ConfirmActionDialog({
       <div className="flex items-start gap-3 mt-1">
         <div
           className={`p-2 rounded-xl shrink-0 ${
-            isDestructive ? "bg-rose-100 text-rose-600" : "bg-teal-100 text-teal-700"
+            isDestructive
+              ? "bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400"
+              : "bg-teal-100 dark:bg-brand-950/60 text-teal-700 dark:text-brand-300"
           }`}
         >
           {isDestructive ? (
@@ -40,7 +42,7 @@ export function ConfirmActionDialog({
             <Info className="w-5 h-5" />
           )}
         </div>
-        <p className="text-sm text-slate-600">{message}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{message}</p>
       </div>
 
       <div className="mt-6 flex items-center justify-end gap-2.5">

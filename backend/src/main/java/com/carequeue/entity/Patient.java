@@ -1,6 +1,7 @@
 package com.carequeue.entity;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Objects;
 
 /**
@@ -19,6 +20,9 @@ public final class Patient {
     private final Instant calledTime;
     private final Instant completedTime;
     private final String notes;
+    private final LocalDate queueDate;
+    private final String departmentCode;
+    private final Integer sequenceNumber;
 
     public Patient(
             String id,
@@ -31,6 +35,23 @@ public final class Patient {
             Instant calledTime,
             Instant completedTime,
             String notes) {
+        this(id, tokenNumber, name, age, department, registrationTime, status, calledTime, completedTime, notes, null, null, null);
+    }
+
+    public Patient(
+            String id,
+            String tokenNumber,
+            String name,
+            Integer age,
+            String department,
+            Instant registrationTime,
+            PatientStatus status,
+            Instant calledTime,
+            Instant completedTime,
+            String notes,
+            LocalDate queueDate,
+            String departmentCode,
+            Integer sequenceNumber) {
         this.id = Objects.requireNonNull(id, "Patient ID cannot be null");
         this.tokenNumber = Objects.requireNonNull(tokenNumber, "Token number cannot be null");
         this.name = Objects.requireNonNull(name, "Patient name cannot be null");
@@ -41,6 +62,9 @@ public final class Patient {
         this.calledTime = calledTime;
         this.completedTime = completedTime;
         this.notes = notes;
+        this.queueDate = queueDate;
+        this.departmentCode = departmentCode;
+        this.sequenceNumber = sequenceNumber;
     }
 
     public String getId() {
@@ -83,6 +107,18 @@ public final class Patient {
         return notes;
     }
 
+    public LocalDate getQueueDate() {
+        return queueDate;
+    }
+
+    public String getDepartmentCode() {
+        return departmentCode;
+    }
+
+    public Integer getSequenceNumber() {
+        return sequenceNumber;
+    }
+
     /**
      * Creates a new Patient instance with updated status and timestamp.
      */
@@ -97,7 +133,10 @@ public final class Patient {
                 PatientStatus.CALLED,
                 callTime,
                 null,
-                this.notes
+                this.notes,
+                this.queueDate,
+                this.departmentCode,
+                this.sequenceNumber
         );
     }
 
@@ -112,7 +151,10 @@ public final class Patient {
                 PatientStatus.COMPLETED,
                 this.calledTime,
                 completeTime,
-                this.notes
+                this.notes,
+                this.queueDate,
+                this.departmentCode,
+                this.sequenceNumber
         );
     }
 
@@ -127,7 +169,10 @@ public final class Patient {
                 PatientStatus.CANCELLED,
                 this.calledTime,
                 this.completedTime,
-                this.notes
+                this.notes,
+                this.queueDate,
+                this.departmentCode,
+                this.sequenceNumber
         );
     }
 
@@ -151,6 +196,9 @@ public final class Patient {
                 ", name='" + name + '\'' +
                 ", department='" + department + '\'' +
                 ", status=" + status +
+                ", queueDate=" + queueDate +
+                ", departmentCode='" + departmentCode + '\'' +
+                ", sequenceNumber=" + sequenceNumber +
                 '}';
     }
 }

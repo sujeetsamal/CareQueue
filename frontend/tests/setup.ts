@@ -11,3 +11,18 @@ Object.defineProperty(window, "speechSynthesis", {
   },
   writable: true,
 });
+
+// Mock window.matchMedia for theme tests in JSDOM
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }),
+});

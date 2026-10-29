@@ -34,7 +34,7 @@ spring:
 carequeue:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
-  seed-demo-data: ${CAREQUEUE_SEED_DEMO_DATA:true}
+  seed-demo-data: ${CAREQUEUE_SEED_DEMO_DATA:false}
 
 management:
   endpoints:

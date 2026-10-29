@@ -13,6 +13,9 @@ export interface Patient {
   notes: string | null;
   queuePosition: number | null;
   waitDurationSeconds: number | null;
+  queueDate?: string | null;
+  departmentCode?: string | null;
+  sequenceNumber?: number | null;
 }
 
 export interface RegisterPatientInput {
@@ -20,6 +23,38 @@ export interface RegisterPatientInput {
   department: string;
   age?: number | null;
   notes?: string | null;
+}
+
+export interface SimilarPatient {
+  id: string;
+  name: string;
+  tokenNumber: string;
+  department: string;
+  registrationTime: string;
+  status: PatientStatus;
+  similarityScore: number;
+  isWaiting: boolean;
+}
+
+export interface PagedResponse<T> {
+  content: T[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  isFirst: boolean;
+  isLast: boolean;
+}
+
+export interface RegistryFilterParams {
+  page?: number;
+  size?: number;
+  search?: string;
+  department?: string;
+  status?: PatientStatus | "ALL";
+  sortBy?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface QueueStats {
