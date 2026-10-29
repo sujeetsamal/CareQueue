@@ -23,9 +23,11 @@ RUN ./mvnw clean package -DskipTests -B
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Create a non-privileged application user
-RUN addgroup -S carequeue && adduser -S carequeue -G carequeue
+# Create a non-privileged application user with data directory permissions
+RUN addgroup -S carequeue && adduser -S carequeue -G carequeue \
+    && mkdir -p /app/data && chown -R carequeue:carequeue /app
 USER carequeue
+
 
 # Copy packaged JAR from builder stage
 COPY --from=builder /workspace/backend/target/carequeue-backend-*.jar app.jar
