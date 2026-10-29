@@ -1,0 +1,30 @@
+server:
+  port: 0
+
+spring:
+  application:
+    name: carequeue-backend-test
+  datasource:
+    url: jdbc:h2:mem:carequeue_test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+carequeue:
+  cors:
+    allowed-origins: http://localhost:3000
+  seed-demo-data: false
+
+logging:
+  level:
+    root: WARN
+    com.carequeue: INFO
