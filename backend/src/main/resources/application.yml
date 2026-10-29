@@ -6,10 +6,11 @@ spring:
   application:
     name: carequeue-backend
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/carequeue_db}
-    username: ${SPRING_DATASOURCE_USERNAME:carequeue_user}
-    password: ${SPRING_DATASOURCE_PASSWORD:carequeue_secret_dev}
-    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+    # Default to persistent local file-based database (PostgreSQL mode) for zero-Docker standalone execution.
+    # Set SPRING_DATASOURCE_URL to jdbc:postgresql://... for production or Docker.
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:./data/carequeue_db;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
